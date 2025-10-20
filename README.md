@@ -2,6 +2,8 @@
 
 A PyTorch implementation of a diffusion model for video prediction. This framework uses a 3D U-Net architecture with temporal attention to predict future video frames given context frames.
 
+**Developed by AI Research Group, Department of Civil Engineering, King Mongkut's University of Technology Thonburi (KMUTT)**
+
 ## Features
 
 - **3D U-Net Architecture**: Spatial-temporal convolutions for video processing
@@ -294,11 +296,12 @@ python train.py --num_timesteps 500
 If you use this code in your research, please cite:
 
 ```bibtex
-@misc{video_diffusion_prediction,
+@misc{video_diffusion_prediction_2025,
   title={Video Diffusion Prediction Framework},
-  author={Your Name},
+  author={AI Research Group, Department of Civil Engineering, KMUTT},
   year={2025},
-  howpublished={\url{https://github.com/yourusername/video_diffusion_prediction}}
+  institution={King Mongkut's University of Technology Thonburi},
+  howpublished={\url{https://github.com/Sompote/VDO_diffusion}}
 }
 ```
 
