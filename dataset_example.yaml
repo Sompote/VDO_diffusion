@@ -1,0 +1,26 @@
+# Example dataset definition in YOLO-style format
+# Paths can be absolute or relative to this YAML file.
+# Each directory can contain video files or sub-folders of ordered frame images.
+# Example (frame sequence):
+# data/train_videos/drive_001/frame_0001.jpg ... frame_0010.jpg
+# data/val_videos/drive_042/frame_0001.png ...
+
+train: "./data/train_videos"
+val: "./data/val_videos"
+# test: "./data/test_videos"   # Optional
+
+# Optional metadata
+names:
+  - tunnel_face
+
+# Sequence layout: provide how many frames the model sees vs predicts.
+context_frames: 8            # Number of input frames (a.k.a. past frames)
+future_frames: 1             # Number of frames to predict
+
+# Frame sampling controls
+frame_size: [256, 256]       # Resized resolution (H, W)
+frame_interval: 1            # Sample every Nth frame when building clips
+
+# Augmentation toggles
+augment: true                # Enable random augmentations during training
+val_augment: false           # Keep validation deterministic

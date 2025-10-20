@@ -1,0 +1,37 @@
+{
+    "output_dir": "tmp_runs/demo",
+    "batch_size": 1,
+    "epochs": 1,
+    "num_frames": 4,
+    "context_frames": 2,
+    "future_frames": 2,
+    "frame_size": [
+        32,
+        32
+    ],
+    "frame_interval": 1,
+    "base_channels": 8,
+    "channel_mults": [
+        1
+    ],
+    "time_emb_dim": 64,
+    "num_timesteps": 4,
+    "beta_start": 0.0001,
+    "beta_end": 0.02,
+    "schedule": "linear",
+    "lr": 0.001,
+    "weight_decay": 0.0,
+    "num_workers": 0,
+    "save_interval": 1,
+    "gpus": 0,
+    "train_augment": false,
+    "val_augment": false,
+    "train_dir": "/Users/sompoteyouwai/env/video_diffusion_prediction/tmp_demo/train",
+    "val_dir": "/Users/sompoteyouwai/env/video_diffusion_prediction/tmp_demo/val",
+    "test_dir": null,
+    "data_config_path": "tmp_demo_data.yaml",
+    "config_path": "tmp_demo_config.yaml",
+    "data_names": null,
+    "data_num_classes": null,
+    "resume": null
+}

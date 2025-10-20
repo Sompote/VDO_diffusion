@@ -1,0 +1,30 @@
+diffusion:
+  beta_end: 0.02
+  beta_start: 0.0001
+  num_timesteps: 4
+  schedule: linear
+gpu:
+  gpus: 0
+model:
+  base_channels: 8
+  channel_mults:
+  - 1
+  time_emb_dim: 64
+output:
+  name: demo
+  project: ./tmp_runs
+prediction:
+  num_context_frames: 2
+  num_future_frames: 2
+training:
+  batch_size: 1
+  epochs: 1
+  lr: 0.001
+  num_workers: 0
+  save_interval: 1
+  weight_decay: 0.0
+video:
+  frame_interval: 1
+  frame_size:
+  - 32
+  - 32

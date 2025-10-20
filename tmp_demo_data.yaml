@@ -1,0 +1,10 @@
+augment: false
+context_frames: 2
+frame_interval: 1
+frame_size:
+- 32
+- 32
+future_frames: 2
+train: tmp_demo/train
+val: tmp_demo/val
+val_augment: false

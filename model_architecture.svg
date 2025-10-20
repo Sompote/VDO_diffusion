@@ -1,0 +1,292 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1800 2400" style="background-color: #f8f9fa;">
+  <!-- Title -->
+  <text x="900" y="40" font-size="32" font-weight="bold" text-anchor="middle" fill="#2c3e50">
+    Video Diffusion Model Architecture
+  </text>
+  <text x="900" y="70" font-size="18" text-anchor="middle" fill="#7f8c8d">
+    Latent Diffusion Transformer (DiT) with 3D VAE - Production Pipeline
+  </text>
+
+  <!-- Legend -->
+  <g id="legend">
+    <rect x="50" y="90" width="700" height="80" fill="#ecf0f1" stroke="#95a5a6" stroke-width="2" rx="5"/>
+    <text x="70" y="115" font-size="16" font-weight="bold" fill="#2c3e50">Legend:</text>
+    <rect x="70" y="125" width="30" height="20" fill="#3498db" opacity="0.3"/>
+    <text x="110" y="140" font-size="14" fill="#2c3e50">Encoder</text>
+    <rect x="200" y="125" width="30" height="20" fill="#e74c3c" opacity="0.3"/>
+    <text x="240" y="140" font-size="14" fill="#2c3e50">Diffusion Process</text>
+    <rect x="380" y="125" width="30" height="20" fill="#2ecc71" opacity="0.3"/>
+    <text x="420" y="140" font-size="14" fill="#2c3e50">Transformer</text>
+    <rect x="550" y="125" width="30" height="20" fill="#9b59b6" opacity="0.3"/>
+    <text x="590" y="140" font-size="14" fill="#2c3e50">Decoder</text>
+    <text x="70" y="160" font-size="12" fill="#7f8c8d">Data Shape: (Batch, Channels, Frames, Height, Width)</text>
+  </g>
+
+  <!-- ========== STAGE 1: INPUT VIDEO ========== -->
+  <g id="input">
+    <rect x="700" y="200" width="400" height="80" fill="#3498db" opacity="0.2" stroke="#3498db" stroke-width="3" rx="10"/>
+    <text x="900" y="230" font-size="18" font-weight="bold" text-anchor="middle" fill="#2c3e50">INPUT VIDEO</text>
+    <text x="900" y="255" font-size="16" text-anchor="middle" fill="#34495e">(B, 3, 16, 256, 256)</text>
+    <text x="900" y="275" font-size="13" text-anchor="middle" fill="#7f8c8d">RGB video: 16 frames @ 256×256</text>
+  </g>
+
+  <!-- Arrow -->
+  <path d="M 900 280 L 900 320" stroke="#2c3e50" stroke-width="3" fill="none" marker-end="url(#arrowhead)"/>
+
+  <!-- ========== STAGE 2: VAE ENCODER ========== -->
+  <g id="vae-encoder">
+    <rect x="600" y="320" width="600" height="280" fill="#3498db" opacity="0.1" stroke="#3498db" stroke-width="3" rx="10"/>
+    <text x="900" y="345" font-size="20" font-weight="bold" text-anchor="middle" fill="#2c3e50">STAGE 1: 3D VAE ENCODER</text>
+    <text x="900" y="365" font-size="13" text-anchor="middle" fill="#7f8c8d">Spatial-Temporal Compression: 192× (3.1M → 16K values)</text>
+
+    <!-- Encoder blocks -->
+    <rect x="650" y="380" width="500" height="50" fill="#3498db" opacity="0.3" stroke="#2980b9" stroke-width="2" rx="5"/>
+    <text x="900" y="400" font-size="14" font-weight="bold" text-anchor="middle" fill="#2c3e50">Conv3D Block 1</text>
+    <text x="900" y="418" font-size="12" text-anchor="middle" fill="#34495e">(B, 3, 16, 256, 256) → (B, 128, 16, 128, 128)</text>
+
+    <path d="M 900 430 L 900 445" stroke="#2c3e50" stroke-width="2" fill="none" marker-end="url(#arrowhead-small)"/>
+
+    <rect x="650" y="445" width="500" height="50" fill="#3498db" opacity="0.3" stroke="#2980b9" stroke-width="2" rx="5"/>
+    <text x="900" y="465" font-size="14" font-weight="bold" text-anchor="middle" fill="#2c3e50">Conv3D Block 2 + Downsample</text>
+    <text x="900" y="483" font-size="12" text-anchor="middle" fill="#34495e">(B, 128, 16, 128, 128) → (B, 256, 8, 64, 64)</text>
+
+    <path d="M 900 495 L 900 510" stroke="#2c3e50" stroke-width="2" fill="none" marker-end="url(#arrowhead-small)"/>
+
+    <rect x="650" y="510" width="500" height="50" fill="#3498db" opacity="0.3" stroke="#2980b9" stroke-width="2" rx="5"/>
+    <text x="900" y="530" font-size="14" font-weight="bold" text-anchor="middle" fill="#2c3e50">Conv3D Block 3 + Downsample</text>
+    <text x="900" y="548" font-size="12" text-anchor="middle" fill="#34495e">(B, 256, 8, 64, 64) → (B, 512, 4, 32, 32)</text>
+
+    <path d="M 900 560 L 900 575" stroke="#2c3e50" stroke-width="2" fill="none" marker-end="url(#arrowhead-small)"/>
+
+    <rect x="700" y="575" width="400" height="20" fill="#3498db" opacity="0.5" stroke="#2980b9" stroke-width="2" rx="5"/>
+    <text x="900" y="590" font-size="12" font-weight="bold" text-anchor="middle" fill="#2c3e50">Latent Projection: (B, 4, 4, 32, 32)</text>
+  </g>
+
+  <!-- Arrow -->
+  <path d="M 900 600 L 900 640" stroke="#2c3e50" stroke-width="3" fill="none" marker-end="url(#arrowhead)"/>
+
+  <!-- ========== STAGE 3: DIFFUSION PROCESS ========== -->
+  <g id="diffusion">
+    <rect x="550" y="640" width="700" height="180" fill="#e74c3c" opacity="0.1" stroke="#e74c3c" stroke-width="3" rx="10"/>
+    <text x="900" y="665" font-size="20" font-weight="bold" text-anchor="middle" fill="#2c3e50">STAGE 2: DIFFUSION PROCESS</text>
+    <text x="900" y="685" font-size="13" text-anchor="middle" fill="#7f8c8d">Add noise during training / Iterative denoising during sampling</text>
+
+    <!-- Timestep Embedding -->
+    <rect x="580" y="700" width="180" height="80" fill="#e67e22" opacity="0.3" stroke="#d35400" stroke-width="2" rx="5"/>
+    <text x="670" y="725" font-size="14" font-weight="bold" text-anchor="middle" fill="#2c3e50">Timestep t</text>
+    <text x="670" y="745" font-size="12" text-anchor="middle" fill="#34495e">SinusoidalPosEmb</text>
+    <text x="670" y="765" font-size="11" text-anchor="middle" fill="#7f8c8d">(B,) → (B, 256)</text>
+
+    <!-- Noise Addition -->
+    <rect x="810" y="700" width="400" height="80" fill="#e74c3c" opacity="0.3" stroke="#c0392b" stroke-width="2" rx="5"/>
+    <text x="1010" y="720" font-size="14" font-weight="bold" text-anchor="middle" fill="#2c3e50">Training: Add Noise</text>
+    <text x="1010" y="740" font-size="12" text-anchor="middle" fill="#34495e">x_t = √(ᾱ_t) · x₀ + √(1-ᾱ_t) · ε</text>
+    <text x="1010" y="760" font-size="11" text-anchor="middle" fill="#7f8c8d">V-Prediction: v = √(ᾱ_t) · ε - √(1-ᾱ_t) · x₀</text>
+    <text x="1010" y="775" font-size="11" text-anchor="middle" fill="#7f8c8d">Noisy Latent: (B, 4, 4, 32, 32)</text>
+
+    <path d="M 670 780 L 670 795 L 900 795 L 900 810" stroke="#2c3e50" stroke-width="2" fill="none" marker-end="url(#arrowhead-small)"/>
+    <path d="M 1010 780 L 1010 795 L 900 795 L 900 810" stroke="#2c3e50" stroke-width="2" fill="none" marker-end="url(#arrowhead-small)"/>
+  </g>
+
+  <!-- Arrow -->
+  <path d="M 900 820 L 900 860" stroke="#2c3e50" stroke-width="3" fill="none" marker-end="url(#arrowhead)"/>
+
+  <!-- ========== STAGE 4: LATENT VIDEO DiT ========== -->
+  <g id="transformer">
+    <rect x="350" y="860" width="1100" height="620" fill="#2ecc71" opacity="0.05" stroke="#2ecc71" stroke-width="3" rx="10"/>
+    <text x="900" y="885" font-size="20" font-weight="bold" text-anchor="middle" fill="#2c3e50">STAGE 3: LATENT VIDEO DiT (Diffusion Transformer)</text>
+    <text x="900" y="905" font-size="13" text-anchor="middle" fill="#7f8c8d">12 DiT Blocks × Factorized Attention (15× faster than full 3D)</text>
+
+    <!-- Patchify -->
+    <rect x="650" y="920" width="500" height="50" fill="#16a085" opacity="0.3" stroke="#138d75" stroke-width="2" rx="5"/>
+    <text x="900" y="940" font-size="14" font-weight="bold" text-anchor="middle" fill="#2c3e50">Patchify (2×2 patches)</text>
+    <text x="900" y="958" font-size="12" text-anchor="middle" fill="#34495e">(B, 4, 4, 32, 32) → (B, 4×256, 768) = (B, 1024, 768)</text>
+
+    <path d="M 900 970 L 900 990" stroke="#2c3e50" stroke-width="2" fill="none" marker-end="url(#arrowhead-small)"/>
+
+    <!-- DiT Block (detailed) -->
+    <rect x="380" y="990" width="1040" height="430" fill="#2ecc71" opacity="0.2" stroke="#27ae60" stroke-width="3" rx="10"/>
+    <text x="900" y="1015" font-size="16" font-weight="bold" text-anchor="middle" fill="#2c3e50">DiT Block (×12 repeated)</text>
+
+    <!-- AdaLN -->
+    <rect x="650" y="1030" width="500" height="45" fill="#f39c12" opacity="0.3" stroke="#e67e22" stroke-width="2" rx="5"/>
+    <text x="900" y="1050" font-size="13" font-weight="bold" text-anchor="middle" fill="#2c3e50">1. Adaptive LayerNorm (AdaLN)</text>
+    <text x="900" y="1067" font-size="11" text-anchor="middle" fill="#34495e">Time-conditioned modulation: scale + shift</text>
+
+    <path d="M 900 1075 L 900 1090" stroke="#2c3e50" stroke-width="2" fill="none" marker-end="url(#arrowhead-small)"/>
+
+    <!-- Spatial Attention -->
+    <g id="spatial-attention">
+      <rect x="410" y="1090" width="440" height="150" fill="#3498db" opacity="0.2" stroke="#2980b9" stroke-width="2" rx="5"/>
+      <text x="630" y="1115" font-size="14" font-weight="bold" text-anchor="middle" fill="#2c3e50">2a. Spatial Attention</text>
+      <text x="630" y="1135" font-size="12" text-anchor="middle" fill="#34495e">Input: (B, T=4, N=256, D=768)</text>
+      <text x="630" y="1153" font-size="11" text-anchor="middle" fill="#7f8c8d">Process each frame independently</text>
+
+      <rect x="430" y="1165" width="400" height="30" fill="#3498db" opacity="0.4" stroke="#2980b9" stroke-width="1" rx="3"/>
+      <text x="630" y="1185" font-size="11" text-anchor="middle" fill="#2c3e50">Multi-Head Self-Attention (12 heads, 64-dim each)</text>
+
+      <rect x="430" y="1200" width="400" height="30" fill="#3498db" opacity="0.4" stroke="#2980b9" stroke-width="1" rx="3"/>
+      <text x="630" y="1220" font-size="11" text-anchor="middle" fill="#2c3e50">Complexity: O(N²) = O(256²) per frame</text>
+    </g>
+
+    <!-- Temporal Attention -->
+    <g id="temporal-attention">
+      <rect x="950" y="1090" width="440" height="150" fill="#e67e22" opacity="0.2" stroke="#d35400" stroke-width="2" rx="5"/>
+      <text x="1170" y="1115" font-size="14" font-weight="bold" text-anchor="middle" fill="#2c3e50">2b. Temporal Attention</text>
+      <text x="1170" y="1135" font-size="12" text-anchor="middle" fill="#34495e">Rearrange: (B×N=256, T=4, D=768)</text>
+      <text x="1170" y="1153" font-size="11" text-anchor="middle" fill="#7f8c8d">Attend across time for each patch</text>
+
+      <rect x="970" y="1165" width="400" height="30" fill="#e67e22" opacity="0.4" stroke="#d35400" stroke-width="1" rx="3"/>
+      <text x="1170" y="1185" font-size="11" text-anchor="middle" fill="#2c3e50">Multi-Head Self-Attention (12 heads, 64-dim each)</text>
+
+      <rect x="970" y="1200" width="400" height="30" fill="#e67e22" opacity="0.4" stroke="#d35400" stroke-width="1" rx="3"/>
+      <text x="1170" y="1220" font-size="11" text-anchor="middle" fill="#2c3e50">Complexity: O(T²) = O(4²) per patch</text>
+    </g>
+
+    <!-- Merge paths -->
+    <path d="M 630 1240 L 630 1265 L 900 1265 L 900 1280" stroke="#2c3e50" stroke-width="2" fill="none" marker-end="url(#arrowhead-small)"/>
+    <path d="M 1170 1240 L 1170 1265 L 900 1265 L 900 1280" stroke="#2c3e50" stroke-width="2" fill="none" marker-end="url(#arrowhead-small)"/>
+
+    <!-- Feed Forward -->
+    <rect x="650" y="1280" width="500" height="120" fill="#9b59b6" opacity="0.2" stroke="#8e44ad" stroke-width="2" rx="5"/>
+    <text x="900" y="1305" font-size="14" font-weight="bold" text-anchor="middle" fill="#2c3e50">3. Feed-Forward Network (FFN)</text>
+
+    <rect x="680" y="1320" width="440" height="30" fill="#9b59b6" opacity="0.3" stroke="#8e44ad" stroke-width="1" rx="3"/>
+    <text x="900" y="1340" font-size="11" text-anchor="middle" fill="#2c3e50">Linear: 768 → 3072×2 (GEGLU activation)</text>
+
+    <rect x="680" y="1355" width="440" height="30" fill="#9b59b6" opacity="0.3" stroke="#8e44ad" stroke-width="1" rx="3"/>
+    <text x="900" y="1375" font-size="11" text-anchor="middle" fill="#2c3e50">Linear: 3072 → 768 + Residual Connection</text>
+
+    <!-- Efficiency Note -->
+    <rect x="400" y="1430" width="1000" height="40" fill="#27ae60" opacity="0.2" stroke="#27ae60" stroke-width="2" rx="5"/>
+    <text x="900" y="1455" font-size="13" font-weight="bold" text-anchor="middle" fill="#27ae60">
+      ⚡ Factorized Attention Speedup: O(N²+T²) = O(65K) vs Full 3D: O((N×T)²) = O(1M) → 15× faster
+    </text>
+  </g>
+
+  <!-- Arrow -->
+  <path d="M 900 1480 L 900 1520" stroke="#2c3e50" stroke-width="3" fill="none" marker-end="url(#arrowhead)"/>
+
+  <!-- Output from DiT -->
+  <rect x="700" y="1520" width="400" height="50" fill="#2ecc71" opacity="0.3" stroke="#27ae60" stroke-width="2" rx="5"/>
+  <text x="900" y="1540" font-size="14" font-weight="bold" text-anchor="middle" fill="#2c3e50">Unpatchify + Linear Projection</text>
+  <text x="900" y="1560" font-size="12" text-anchor="middle" fill="#34495e">Predicted V: (B, 4, 4, 32, 32)</text>
+
+  <path d="M 900 1570 L 900 1610" stroke="#2c3e50" stroke-width="3" fill="none" marker-end="url(#arrowhead)"/>
+
+  <!-- ========== STAGE 5: VAE DECODER ========== -->
+  <g id="vae-decoder">
+    <rect x="600" y="1610" width="600" height="280" fill="#9b59b6" opacity="0.1" stroke="#9b59b6" stroke-width="3" rx="10"/>
+    <text x="900" y="1635" font-size="20" font-weight="bold" text-anchor="middle" fill="#2c3e50">STAGE 4: 3D VAE DECODER</text>
+    <text x="900" y="1655" font-size="13" text-anchor="middle" fill="#7f8c8d">Spatial-Temporal Decompression: 192× (16K → 3.1M values)</text>
+
+    <rect x="700" y="1670" width="400" height="20" fill="#9b59b6" opacity="0.5" stroke="#8e44ad" stroke-width="2" rx="5"/>
+    <text x="900" y="1685" font-size="12" font-weight="bold" text-anchor="middle" fill="#2c3e50">Latent Input: (B, 4, 4, 32, 32)</text>
+
+    <path d="M 900 1690 L 900 1705" stroke="#2c3e50" stroke-width="2" fill="none" marker-end="url(#arrowhead-small)"/>
+
+    <!-- Decoder blocks -->
+    <rect x="650" y="1705" width="500" height="50" fill="#9b59b6" opacity="0.3" stroke="#8e44ad" stroke-width="2" rx="5"/>
+    <text x="900" y="1725" font-size="14" font-weight="bold" text-anchor="middle" fill="#2c3e50">ConvTranspose3D Block 1</text>
+    <text x="900" y="1743" font-size="12" text-anchor="middle" fill="#34495e">(B, 512, 4, 32, 32) → (B, 256, 8, 64, 64)</text>
+
+    <path d="M 900 1755 L 900 1770" stroke="#2c3e50" stroke-width="2" fill="none" marker-end="url(#arrowhead-small)"/>
+
+    <rect x="650" y="1770" width="500" height="50" fill="#9b59b6" opacity="0.3" stroke="#8e44ad" stroke-width="2" rx="5"/>
+    <text x="900" y="1790" font-size="14" font-weight="bold" text-anchor="middle" fill="#2c3e50">ConvTranspose3D Block 2</text>
+    <text x="900" y="1808" font-size="12" text-anchor="middle" fill="#34495e">(B, 256, 8, 64, 64) → (B, 128, 16, 128, 128)</text>
+
+    <path d="M 900 1820 L 900 1835" stroke="#2c3e50" stroke-width="2" fill="none" marker-end="url(#arrowhead-small)"/>
+
+    <rect x="650" y="1835" width="500" height="50" fill="#9b59b6" opacity="0.3" stroke="#8e44ad" stroke-width="2" rx="5"/>
+    <text x="900" y="1855" font-size="14" font-weight="bold" text-anchor="middle" fill="#2c3e50">ConvTranspose3D Block 3 + Tanh</text>
+    <text x="900" y="1873" font-size="12" text-anchor="middle" fill="#34495e">(B, 128, 16, 128, 128) → (B, 3, 16, 256, 256)</text>
+  </g>
+
+  <!-- Arrow -->
+  <path d="M 900 1890 L 900 1930" stroke="#2c3e50" stroke-width="3" fill="none" marker-end="url(#arrowhead)"/>
+
+  <!-- ========== OUTPUT VIDEO ========== -->
+  <g id="output">
+    <rect x="700" y="1930" width="400" height="80" fill="#27ae60" opacity="0.3" stroke="#27ae60" stroke-width="3" rx="10"/>
+    <text x="900" y="1960" font-size="18" font-weight="bold" text-anchor="middle" fill="#2c3e50">OUTPUT VIDEO</text>
+    <text x="900" y="1985" font-size="16" text-anchor="middle" fill="#34495e">(B, 3, 16, 256, 256)</text>
+    <text x="900" y="2005" font-size="13" text-anchor="middle" fill="#7f8c8d">Generated/Predicted RGB video</text>
+  </g>
+
+  <!-- ========== TRAINING OBJECTIVE ========== -->
+  <g id="training">
+    <rect x="50" y="2050" width="800" height="120" fill="#e74c3c" opacity="0.1" stroke="#e74c3c" stroke-width="2" rx="10"/>
+    <text x="450" y="2075" font-size="16" font-weight="bold" text-anchor="middle" fill="#2c3e50">TRAINING OBJECTIVE</text>
+    <text x="450" y="2100" font-size="13" text-anchor="middle" fill="#34495e">V-Prediction Loss:</text>
+    <text x="450" y="2120" font-size="12" text-anchor="middle" fill="#7f8c8d">L = MSE(predicted_v, target_v)</text>
+    <text x="450" y="2140" font-size="11" text-anchor="middle" fill="#7f8c8d">where v = √(ᾱ_t) · ε - √(1-ᾱ_t) · x₀</text>
+    <text x="450" y="2160" font-size="11" font-weight="bold" text-anchor="middle" fill="#27ae60">✓ Better color stability &amp; training dynamics</text>
+  </g>
+
+  <!-- ========== CLASSIFIER-FREE GUIDANCE ========== -->
+  <g id="cfg">
+    <rect x="900" y="2050" width="850" height="120" fill="#3498db" opacity="0.1" stroke="#3498db" stroke-width="2" rx="10"/>
+    <text x="1325" y="2075" font-size="16" font-weight="bold" text-anchor="middle" fill="#2c3e50">CLASSIFIER-FREE GUIDANCE (CFG)</text>
+    <text x="1325" y="2100" font-size="13" text-anchor="middle" fill="#34495e">Training: 10% unconditional (null class)</text>
+    <text x="1325" y="2120" font-size="12" text-anchor="middle" fill="#7f8c8d">Sampling: pred = pred_uncond + w · (pred_cond - pred_uncond)</text>
+    <text x="1325" y="2140" font-size="11" text-anchor="middle" fill="#7f8c8d">Guidance scale w: 1.0 (diverse) → 7.5 (balanced) → 15.0 (high fidelity)</text>
+    <text x="1325" y="2160" font-size="11" font-weight="bold" text-anchor="middle" fill="#27ae60">✓ Controllable quality vs. diversity tradeoff</text>
+  </g>
+
+  <!-- ========== MODEL SPECIFICATIONS ========== -->
+  <g id="specs">
+    <rect x="50" y="2200" width="1700" height="150" fill="#ecf0f1" stroke="#95a5a6" stroke-width="2" rx="10"/>
+    <text x="900" y="2225" font-size="18" font-weight="bold" text-anchor="middle" fill="#2c3e50">MODEL SPECIFICATIONS</text>
+
+    <!-- Column 1 -->
+    <text x="100" y="2250" font-size="13" font-weight="bold" fill="#2c3e50">Architecture:</text>
+    <text x="100" y="2270" font-size="11" fill="#34495e">• Hidden Dim: 768</text>
+    <text x="100" y="2285" font-size="11" fill="#34495e">• DiT Blocks: 12</text>
+    <text x="100" y="2300" font-size="11" fill="#34495e">• Attention Heads: 12</text>
+    <text x="100" y="2315" font-size="11" fill="#34495e">• Parameters: ~400M</text>
+    <text x="100" y="2330" font-size="11" fill="#34495e">• Patch Size: 2×2</text>
+
+    <!-- Column 2 -->
+    <text x="400" y="2250" font-size="13" font-weight="bold" fill="#2c3e50">VAE Specs:</text>
+    <text x="400" y="2270" font-size="11" fill="#34495e">• Base Channels: 128</text>
+    <text x="400" y="2285" font-size="11" fill="#34495e">• Spatial Downsample: 8×</text>
+    <text x="400" y="2300" font-size="11" fill="#34495e">• Temporal Downsample: 4×</text>
+    <text x="400" y="2315" font-size="11" fill="#34495e">• Latent Channels: 4</text>
+    <text x="400" y="2330" font-size="11" fill="#34495e">• Compression: 192×</text>
+
+    <!-- Column 3 -->
+    <text x="700" y="2250" font-size="13" font-weight="bold" fill="#2c3e50">Diffusion:</text>
+    <text x="700" y="2270" font-size="11" fill="#34495e">• Timesteps: 1000</text>
+    <text x="700" y="2285" font-size="11" fill="#34495e">• Schedule: Cosine</text>
+    <text x="700" y="2300" font-size="11" fill="#34495e">• Prediction: V-prediction</text>
+    <text x="700" y="2315" font-size="11" fill="#34495e">• Sampling: DDPM/DDIM</text>
+    <text x="700" y="2330" font-size="11" fill="#34495e">• CFG Scale: 7.5 (default)</text>
+
+    <!-- Column 4 -->
+    <text x="1050" y="2250" font-size="13" font-weight="bold" fill="#2c3e50">Training:</text>
+    <text x="1050" y="2270" font-size="11" fill="#34495e">• Mixed Precision: AMP (2× faster)</text>
+    <text x="1050" y="2285" font-size="11" fill="#34495e">• EMA Decay: 0.9999</text>
+    <text x="1050" y="2300" font-size="11" fill="#34495e">• Batch Size: 4 (16GB GPU)</text>
+    <text x="1050" y="2315" font-size="11" fill="#34495e">• Learning Rate: 1e-4</text>
+    <text x="1050" y="2330" font-size="11" fill="#34495e">• Unconditional Prob: 0.1</text>
+
+    <!-- Column 5 -->
+    <text x="1450" y="2250" font-size="13" font-weight="bold" fill="#2c3e50">Performance:</text>
+    <text x="1450" y="2270" font-size="11" fill="#34495e">• GPU Memory: ~12GB</text>
+    <text x="1450" y="2285" font-size="11" fill="#34495e">• Speedup vs Basic: 15-30×</text>
+    <text x="1450" y="2300" font-size="11" fill="#34495e">• Training Time: ~3 days (V100)</text>
+    <text x="1450" y="2315" font-size="11" fill="#34495e">• Based on: Latte, Sora, DiT</text>
+    <text x="1450" y="2330" font-size="11" fill="#34495e">• Year: 2024-2025 SOTA</text>
+  </g>
+
+  <!-- Arrow markers -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#2c3e50"/>
+    </marker>
+    <marker id="arrowhead-small" markerWidth="8" markerHeight="8" refX="7" refY="2.5" orient="auto">
+      <polygon points="0 0, 8 2.5, 0 5" fill="#2c3e50"/>
+    </marker>
+  </defs>
+</svg>

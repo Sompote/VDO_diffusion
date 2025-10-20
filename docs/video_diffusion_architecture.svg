@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1200" viewBox="0 0 800 1200">
+    <style>
+        .title { font-family: sans-serif; font-size: 24px; font-weight: bold; text-anchor: middle; }
+        .box { fill: #f9f9f9; stroke: #333; stroke-width: 2; }
+        .arrow { fill: #333; }
+        .text { font-family: sans-serif; font-size: 14px; }
+        .text-bold { font-weight: bold; }
+        .text-center { text-anchor: middle; }
+    </style>
+
+    <text x="400" y="40" class="title">Video Diffusion Model Pipeline</text>
+
+    <!-- Input Video -->
+    <rect x="300" y="80" width="200" height="50" class="box" />
+    <text x="400" y="110" class="text text-center">INPUT VIDEO</text>
+    <text x="400" y="125" class="text text-center">(B, 3, 16, 256, 256)</text>
+
+    <path d="M 400 130 L 400 160" stroke="#333" stroke-width="2" marker-end="url(#arrow)" />
+
+    <!-- 3D VAE Encoder -->
+    <rect x="200" y="160" width="400" height="100" class="box" />
+    <text x="400" y="180" class="text text-bold text-center">3D VAE ENCODER</text>
+    <text x="400" y="200" class="text text-center">Compression: 256x256x16 → 32x32x4 (192x compression)</text>
+    <text x="250" y="230" class="text">Conv3D</text>
+    <text x="350" y="230" class="text">Downsample</text>
+    <text x="450" y="230" class="text">Downsample</text>
+
+    <path d="M 400 260 L 400 290" stroke="#333" stroke-width="2" marker-end="url(#arrow)" />
+
+    <!-- Latent Space -->
+    <rect x="300" y="290" width="200" height="50" class="box" />
+    <text x="400" y="320" class="text text-center">LATENT SPACE</text>
+    <text x="400" y="335" class="text text-center">(B, 4, 4, 32, 32)</text>
+
+    <path d="M 400 340 L 400 370" stroke="#333" stroke-width="2" marker-end="url(#arrow)" />
+
+    <!-- Latent Video DiT -->
+    <rect x="100" y="370" width="600" height="400" class="box" />
+    <text x="400" y="390" class="text text-bold text-center">LATENT VIDEO DiT (TRANSFORMER)</text>
+
+    <rect x="150" y="420" width="500" height="50" class="box" />
+    <text x="400" y="440" class="text text-center">PATCHIFY & POSITIONAL ENCODING</text>
+    <text x="400" y="460" class="text text-center">Input: (B, 4, 4, 32, 32) → Tokens: (B, T=4, N=256, D=768)</text>
+
+    <path d="M 400 470 L 400 500" stroke="#333" stroke-width="2" marker-end="url(#arrow)" />
+
+    <rect x="150" y="500" width="500" height="50" class="box" />
+    <text x="400" y="520" class="text text-center">TIME STEP EMBEDDING</text>
+    <text x="400" y="540" class="text text-center">Timestep t → Sinusoidal Embedding → MLP</text>
+
+    <path d="M 400 550 L 400 580" stroke="#333" stroke-width="2" marker-end="url(#arrow)" />
+
+    <rect x="150" y="580" width="500" height="150" class="box" />
+    <text x="400" y="600" class="text text-bold text-center">DiT BLOCK × 12 (Depth=12)</text>
+    <text x="250" y="630" class="text">ADALN-ZERO MODULATION</text>
+    <text x="250" y="660" class="text">SPATIAL ATTENTION</text>
+    <text x="250" y="690" class="text">TEMPORAL ATTENTION</text>
+    <text x="250" y="720" class="text">FEED-FORWARD NETWORK</text>
+
+    <path d="M 400 730 L 400 760" stroke="#333" stroke-width="2" marker-end="url(#arrow)" />
+
+    <rect x="150" y="760" width="500" height="50" class="box" />
+    <text x="400" y="780" class="text text-center">FINAL LAYER (with AdaLN)</text>
+    <text x="400" y="800" class="text text-center">Output: (B, 4, 4, 32, 32)</text>
+
+    <path d="M 400 810 L 400 840" stroke="#333" stroke-width="2" marker-end="url(#arrow)" />
+
+    <!-- Predicted Latent -->
+    <rect x="300" y="840" width="200" height="50" class="box" />
+    <text x="400" y="870" class="text text-center">PREDICTED LATENT</text>
+    <text x="400" y="885" class="text text-center">(B, 4, 4, 32, 32)</text>
+
+    <path d="M 400 890 L 400 920" stroke="#333" stroke-width="2" marker-end="url(#arrow)" />
+
+    <!-- 3D VAE Decoder -->
+    <rect x="200" y="920" width="400" height="100" class="box" />
+    <text x="400" y="940" class="text text-bold text-center">3D VAE DECODER</text>
+    <text x="400" y="960" class="text text-center">Decompression: 32x32x4 → 256x256x16</text>
+    <text x="250" y="990" class="text">ConvTrans3D</text>
+    <text x="350" y="990" class="text">ConvTrans3D</text>
+    <text x="450" y="990" class="text">Conv3D</text>
+
+    <path d="M 400 1020 L 400 1050" stroke="#333" stroke-width="2" marker-end="url(#arrow)" />
+
+    <!-- Output Video -->
+    <rect x="300" y="1050" width="200" height="50" class="box" />
+    <text x="400" y="1080" class="text text-center">OUTPUT VIDEO</text>
+    <text x="400" y="1095" class="text text-center">(B, 3, 16, 256, 256)</text>
+
+    <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#333" />
+        </marker>
+    </defs>
+</svg>
