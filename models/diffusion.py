@@ -219,6 +219,28 @@ class VideoDiffusionUNet(nn.Module):
             nn.Conv3d(base_channels, out_channels, kernel_size=3, padding=1),
         )
 
+    def pad_to_multiple(self, x: torch.Tensor, multiple: int) -> Tuple[torch.Tensor, int, int]:
+        """
+        Pad temporal dimension to be a multiple of the given value
+        Returns: padded tensor, original size, padded size
+        """
+        T = x.shape[2]
+        if T % multiple == 0:
+            return x, T, T
+
+        target_T = ((T // multiple) + 1) * multiple
+        pad_size = target_T - T
+        
+        # Pad the last dimension (which is time in our case due to how F.pad works on last dims)
+        # But F.pad works from last dim backwards. 
+        # x shape is (B, C, T, H, W). 
+        # We want to pad T.
+        # F.pad(x, (pad_left, pad_right, pad_top, pad_bottom, pad_front, pad_back))
+        # Corresponds to W, H, T
+        
+        x_padded = F.pad(x, (0, 0, 0, 0, 0, pad_size), mode='replicate')
+        return x_padded, T, target_T
+
     def forward(self, x: torch.Tensor, timesteps: torch.Tensor) -> torch.Tensor:
         """
         Args:
@@ -228,32 +250,43 @@ class VideoDiffusionUNet(nn.Module):
         Returns:
             Predicted noise tensor of shape (B, C, T, H, W)
         """
+        # Calculate required multiple based on number of downsampling layers
+        # Each downblock reduces T by 2. We have len(self.down_blocks) layers.
+        multiple = 2 ** len(self.down_blocks)
+        
+        # Pad input if necessary
+        x_padded, orig_T, padded_T = self.pad_to_multiple(x, multiple)
+        
         # Time embedding
         time_emb = self.time_mlp(timesteps)
 
         # Initial convolution
-        x = self.init_conv(x)
+        h = self.init_conv(x_padded)
 
         # Downsample
         skips = []
         for down_block in self.down_blocks:
-            x, skip = down_block(x, time_emb)
+            h, skip = down_block(h, time_emb)
             skips.append(skip)
 
         # Middle
-        x = self.mid_block1(x, time_emb)
-        x = self.mid_attn(x)
-        x = self.mid_block2(x, time_emb)
+        h = self.mid_block1(h, time_emb)
+        h = self.mid_attn(h)
+        h = self.mid_block2(h, time_emb)
 
         # Upsample
         for up_block in self.up_blocks:
             skip = skips.pop()
-            x = up_block(x, skip, time_emb)
+            h = up_block(h, skip, time_emb)
 
         # Final convolution
-        x = self.final_conv(x)
+        h = self.final_conv(h)
+        
+        # Crop back to original size if padding was applied
+        if orig_T != padded_T:
+            h = h[:, :, :orig_T, :, :]
 
-        return x
+        return h
 
 
 class GaussianDiffusion(nn.Module):
