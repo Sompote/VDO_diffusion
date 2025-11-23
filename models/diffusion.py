@@ -444,7 +444,7 @@ class GaussianDiffusion(nn.Module):
         """
         B, C, T_context, H, W = context_frames.shape
         
-        # Get model's expected number of frames
+        # Get model's expected number of frames (context + future during training)
         model_num_frames = self.model.num_frames if hasattr(self.model, 'num_frames') else 16
         
         # Start with context frames
@@ -452,6 +452,7 @@ class GaussianDiffusion(nn.Module):
         predicted_frames = []
         
         print(f"Generating {num_future_frames} frames autoregressively...")
+        print(f"Model expects {model_num_frames} frames, using {T_context} context frames")
         
         # Generate frames one at a time
         for frame_idx in range(num_future_frames):
@@ -474,8 +475,9 @@ class GaussianDiffusion(nn.Module):
             # Denoise the full sequence
             denoised = self._sample_from_partial(full_sequence, device)
             
-            # Extract the next predicted frame (first frame after context)
-            next_frame = denoised[:, :, T_context:T_context+1, :, :]
+            # Extract the LAST frame as the predicted next frame
+            # This matches training where model predicts the last frame given previous frames
+            next_frame = denoised[:, :, -1:, :, :]
             predicted_frames.append(next_frame)
             
             # Append to current sequence for next iteration
