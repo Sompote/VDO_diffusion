@@ -648,6 +648,13 @@ def train_single_gpu(args):
     """Training on single GPU"""
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Training on device: {device}")
+    
+    # Debug: Show model configuration
+    print(f"\n📊 Model Configuration:")
+    print(f"   num_frames: {args.num_frames}")
+    print(f"   context_frames: {args.context_frames}")
+    print(f"   future_frames: {args.future_frames}")
+    print(f"   frame_size: {args.frame_size}")
 
     # Create model
     unet = VideoDiffusionUNet(
