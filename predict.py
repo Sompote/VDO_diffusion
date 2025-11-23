@@ -142,23 +142,33 @@ def ensure_path(path_str: Optional[str], search_dirs: Sequence[Path]) -> Optiona
 
 def resolve_inference_namespace(args: argparse.Namespace) -> SimpleNamespace:
     """Merge CLI overrides with saved configuration files and sensible defaults."""
-    checkpoint_path = Path(args.checkpoint).resolve()
-    ckpt_parent = checkpoint_path.parent
-
     # Load training config if available
     config_candidate = args.config
+    config_data: Dict[str, Any] = {}
+    config_path: Optional[Path] = None
+
+    if config_candidate is not None:
+        config_path = ensure_path(config_candidate, [Path.cwd()])
+        if config_path is None:
+            raise FileNotFoundError(f"Could not locate config file: {config_candidate}")
+        config_data = load_mapping_file(config_path)
+
+    # Resolve checkpoint path
+    checkpoint_str = args.checkpoint or config_data.get("inference", {}).get("checkpoint") or config_data.get("checkpoint")
+    
+    if checkpoint_str is None:
+        raise ValueError("Checkpoint must be specified via --checkpoint or in config file.")
+        
+    checkpoint_path = Path(checkpoint_str).resolve()
+    ckpt_parent = checkpoint_path.parent
+
+    # If config was not explicitly provided, try to find one near the checkpoint
     if config_candidate is None:
         default_config = ckpt_parent / "config.json"
         if default_config.exists():
             config_candidate = str(default_config)
-
-    config_data: Dict[str, Any] = {}
-    config_path: Optional[Path] = None
-    if config_candidate is not None:
-        config_path = ensure_path(config_candidate, [ckpt_parent])
-        if config_path is None:
-            raise FileNotFoundError(f"Could not locate config file: {config_candidate}")
-        config_data = load_mapping_file(config_path)
+            config_path = default_config
+            config_data = load_mapping_file(config_path)
 
     # Load dataset YAML if available
     data_candidate = args.data or config_data.get("data_config_path")
@@ -400,16 +410,12 @@ def load_video_frames(
     frame_interval: int = 1,
 ):
     """
-    Load frames from video file
+    Load frames from video file or directory of images
 
     Returns:
         Tensor of shape (1, C, T, H, W)
     """
-    cap = cv2.VideoCapture(str(video_path))
-
-    if not cap.isOpened():
-        raise ValueError(f"Cannot open video: {video_path}")
-
+    video_path_obj = Path(video_path)
     frames = []
     transform = transforms.Compose(
         [
@@ -420,25 +426,59 @@ def load_video_frames(
         ]
     )
 
-    frame_index = 0
-    while len(frames) < num_frames:
-        ret, frame = cap.read()
-        if not ret:
-            break
+    if video_path_obj.is_dir():
+        # Load from directory
+        print(f"Loading frames from directory: {video_path}")
+        image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff'}
+        image_files = sorted([
+            f for f in video_path_obj.iterdir() 
+            if f.suffix.lower() in image_extensions
+        ])
+        
+        if not image_files:
+            raise ValueError(f"No image files found in {video_path}")
+            
+        for i, img_path in enumerate(image_files):
+            if len(frames) >= num_frames:
+                break
+                
+            if frame_interval > 1 and i % frame_interval != 0:
+                continue
+                
+            frame = cv2.imread(str(img_path))
+            if frame is None:
+                print(f"Warning: Could not read image {img_path}")
+                continue
+                
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            frames.append(transform(frame))
 
-        if frame_interval > 1 and frame_index % frame_interval != 0:
+    else:
+        # Load from video file
+        cap = cv2.VideoCapture(str(video_path))
+
+        if not cap.isOpened():
+            raise ValueError(f"Cannot open video: {video_path}")
+
+        frame_index = 0
+        while len(frames) < num_frames:
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            if frame_interval > 1 and frame_index % frame_interval != 0:
+                frame_index += 1
+                continue
+
+            # Convert BGR to RGB
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+            # Transform
+            frame_tensor = transform(frame)
+            frames.append(frame_tensor)
             frame_index += 1
-            continue
 
-        # Convert BGR to RGB
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-        # Transform
-        frame_tensor = transform(frame)
-        frames.append(frame_tensor)
-        frame_index += 1
-
-    cap.release()
+        cap.release()
 
     if len(frames) < num_frames:
         if not frames:
@@ -681,7 +721,7 @@ def main():
     parser = argparse.ArgumentParser(description="Video Diffusion Model Inference")
 
     parser.add_argument(
-        "--checkpoint", type=str, required=True, help="Path to model checkpoint (.pth)"
+        "--checkpoint", type=str, required=False, help="Path to model checkpoint (.pth)"
     )
     parser.add_argument(
         "--config",

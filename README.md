@@ -6,10 +6,12 @@ A PyTorch implementation of a diffusion model for video prediction. This framewo
 
 ## Features
 
-- **3D U-Net Architecture**: Spatial-temporal convolutions for video processing
-- **Gaussian Diffusion Process**: Linear and cosine noise schedules
+- **Dual Architecture Support**:
+  - **Basic**: 3D U-Net for pixel-space diffusion
+  - **Advanced**: Latent Diffusion Transformer (DiT) with 3D VAE for high-resolution video
+- **Flexible Input**: Supports video files (`.mp4`, `.avi`) and image sequences (folders of frames)
+- **Configuration**: YAML-based configuration for both training and inference
 - **Multi-GPU Training**: Distributed Data Parallel (DDP) support
-- **Flexible Data Pipeline**: Supports various video formats with augmentation
 - **Video Prediction**: Generate future frames from context frames
 - **Unconditional Generation**: Generate videos from pure noise
 
@@ -24,114 +26,69 @@ pip install -r requirements.txt
 ```
 video_diffusion_prediction/
 ├── models/
-│   └── diffusion.py          # Diffusion model and U-Net architecture
+│   ├── diffusion.py          # Basic U-Net model
+│   └── advanced_diffusion.py # Advanced DiT + VAE model
 ├── data/
 │   └── video_dataset.py      # Video dataset and dataloaders
-├── train.py                   # Training script
-├── predict.py                 # Inference script
-├── requirements.txt           # Python dependencies
-└── README.md                  # This file
+├── train.py                  # Basic training script
+├── train_advanced.py         # Advanced training script (DiT)
+├── predict.py                # Basic inference script
+├── predict_advanced.py       # Advanced inference script
+├── config.yaml               # Basic training config
+├── config_advanced.yaml      # Advanced training config
+├── predict.yaml              # Basic inference config
+├── predict_advanced.yaml     # Advanced inference config
+├── requirements.txt          # Python dependencies
+└── README.md                 # This file
 ```
 
-## Quick Start
+## 🚀 Advanced Model Usage (Recommended)
 
-### 1. Install Dependencies
+The advanced model uses a **Latent Diffusion Transformer (DiT)** architecture, similar to Sora or Stable Video Diffusion. It offers higher quality and efficiency.
+
+### 1. Training
+Edit `config_advanced.yaml` to set your parameters, then run:
 
 ```bash
-pip install -r requirements.txt
+python train_advanced.py --config config_advanced.yaml
 ```
 
-### 2. Declare Your Dataset (YOLO-style)
-
-Create a YAML that points to the tunnel-facing videos **or directories of extracted frames** and defines how many past frames feed the model vs. how many future frames it should predict (see `dataset_example.yaml`).
-
-```yaml
-train: ./data/train_videos
-val: ./data/val_videos
-context_frames: 8      # frames the modeller sees
-future_frames: 1       # frames the modeller predicts
-frame_size: [256, 256]
-frame_interval: 1
-augment: true
+**Data Structure:**
+You can use video files OR folders of images.
+```text
+data/train_videos/
+├── clip_001.mp4
+└── clip_002_folder/
+    ├── frame_001.jpg
+    ├── frame_002.jpg
+    └── ...
 ```
 
-- **Using image folders instead of videos:** organise your dataset so that every clip lives in its own sub-directory. Example:
-
-  ```text
-  data/train/drive_001/frame_0001.jpg
-  data/train/drive_001/frame_0002.jpg
-  …
-  data/train/drive_001/frame_0016.jpg
-  ```
-
-  The loader sorts filenames lexicographically, so use zero-padded numbers (or another scheme that preserves chronological order). Each sub-directory is treated as one clip. Make sure each folder contains at least `context_frames + future_frames` images after applying `frame_interval`; duplicate the last frame if you need to pad the sequence. Supported image formats: `.jpg`, `.jpeg`, `.png`, `.bmp`, `.tif`, `.tiff`.
-- `train`, `val`, `test` (optional): Input sources. Each entry can point to
-  - a directory of video files (`.mp4`, `.avi`, `.mov`, `.mkv`), or
-  - a directory where each child folder holds an ordered set of images (`.jpg`, `.png`, `.bmp`, `.tif`, ...). Each image sub-folder is treated as one clip.
-  Relative paths are resolved against the YAML file’s location, so you can move configs without editing paths.
-- `context_frames`, `future_frames`: Split each clip into the input tunnel-facing sequence and the rock face the model must predict. Override on the CLI if you want to experiment with different horizons.
-- `frame_size`: Resize target in `[H, W]` (single values imply square resizing).
-- `frame_interval`: Sample every *n*-th frame from the source videos; use higher values if the tunnel footage barely changes between frames.
-- `augment`, `val_augment`: Toggle random training augmentations; leave validation deterministic by default.
-- `names`, `nc` (optional): Carry class names or counts if you integrate with downstream YOLO-style tooling.
-- Image sequences must contain at least `context_frames + future_frames` frames (after applying `frame_interval`) so that the loader can build a full clip.
-
-### 3. Configure the Experiment
-
-Set model width, diffusion schedule, optimisation, logging folders, etc. inside `config_example.yaml`. Any value here can still be overridden via CLI flags.
-
-### 4. Train the Model
-
-**Single GPU:**
-```bash
-python train.py \
-    --config config_example.yaml \
-    --data dataset_example.yaml
-```
-
-**Multi-GPU (e.g., 4 GPUs):**
-```bash
-python train.py \
-    --config config_example.yaml \
-    --data dataset_example.yaml \
-    --gpus 4
-```
-
-Override on the fly when needed, e.g.:
+### 2. Prediction
+Edit `predict_advanced.yaml` to point to your checkpoint and input video/folder.
 
 ```bash
-python train.py --config config_example.yaml --data dataset_example.yaml \
-    --batch_size 2 --lr 5e-4 --frame_size 192 256
+python predict_advanced.py --config predict_advanced.yaml
 ```
 
-If you prefer a bare CLI workflow, pass `--train_dir` / `--val_dir` and the usual hyperparameters instead of YAML files.
+---
 
-### 5. Predict the Next Rock Face
+## 🎓 Basic Model Usage (U-Net)
+
+The basic model uses a **3D U-Net**. Good for learning and simple datasets.
+
+### 1. Training
+Edit `config.yaml` and `dataset.yaml` (if needed).
 
 ```bash
-python predict.py \
-    --checkpoint ./runs/experiment1/best_model.pth \
-    --config config_example.yaml \
-    --data dataset_example.yaml \
-    --mode predict \
-    --input_video ./data/test/video.mp4 \
-    --output_dir ./outputs \
-    --output_name tunnel_future
+python train.py --config config.yaml --data dataset.yaml
 ```
 
-This writes `tunnel_future.mp4`, plus `tunnel_future_context.mp4` and `tunnel_future_prediction.mp4` for quick comparison.
-
-### 6. Generate Videos from Noise
+### 2. Prediction
+Edit `predict.yaml` to set your checkpoint and input.
 
 ```bash
-python predict.py \
-    --checkpoint ./runs/experiment1/best_model.pth \
-    --config config_example.yaml \
-    --data dataset_example.yaml \
-    --mode generate \
-    --num_frames 16 \
-    --batch_size 4 \
-    --output_dir ./outputs
+python predict.py --config predict.yaml
 ```
 
 ## Training Parameters

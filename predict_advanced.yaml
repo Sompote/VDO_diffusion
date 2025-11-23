@@ -1,0 +1,44 @@
+# Advanced Video Prediction Configuration
+# Usage: python predict_advanced.py --config predict_advanced.yaml
+
+# Inference Settings
+inference:
+  checkpoint: "./runs/advanced_experiment/checkpoint_latest.pth"
+  input_video: "./data/val_videos/clip_100.mp4" # Can be a video file OR a directory of images
+  output_dir: "./outputs/advanced_predictions"
+  output_name: "prediction_result"
+  device: "cuda"  # or "cpu"
+
+# Video Settings (Must match training)
+video:
+  num_frames: 16              # Total frames to generate
+  num_context_frames: 8       # Number of frames to condition on
+  frame_size: [256, 256]      # Height Width
+  frame_interval: 1           # Sample every Nth frame
+
+# VAE Settings (Must match training)
+vae:
+  latent_channels: 4
+  vae_base_channels: 128
+  vae_channel_mults: [1, 2, 4, 4]
+  spatial_downsample: 8
+  temporal_downsample: 4
+
+# DiT Architecture (Must match training)
+dit:
+  patch_size: [2, 2]
+  hidden_dim: 768
+  depth: 12
+  num_heads: 12
+  dim_head: 64
+  ff_mult: 4
+  dropout: 0.0
+  num_classes: null
+
+# Diffusion Process
+diffusion:
+  num_timesteps: 1000
+  beta_schedule: "cosine"
+  prediction_type: "v"
+  guidance_scale: 7.5         # > 1.0 for classifier-free guidance
+  p_uncond: 0.1

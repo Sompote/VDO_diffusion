@@ -1,0 +1,35 @@
+# Basic Video Prediction Configuration
+# Usage: python predict.py --config predict.yaml
+
+# Inference Settings
+inference:
+  checkpoint: "./runs/experiment/checkpoint_latest.pth"
+  input_video: "./data/val_videos/clip_100.mp4" # Can be a video file OR a directory of images
+  output_dir: "./outputs/predictions"
+  output_name: "prediction_result"
+  device: "cuda"  # or "cpu"
+  mode: "predict" # "predict" or "generate"
+
+# Video Settings (Must match training)
+video:
+  num_frames: 16              # Total frames per clip
+  frame_size: [64, 64]        # Height Width (Basic model usually uses smaller size)
+  frame_interval: 1           # Sample every Nth frame
+
+# Prediction Settings
+prediction:
+  num_context_frames: 8       # Number of frames to condition on
+  num_future_frames: 8        # Number of future frames to predict
+
+# Model Architecture (Optional overrides, usually loaded from checkpoint)
+model:
+  base_channels: 64
+  channel_mults: [1, 2, 4, 8]
+  time_emb_dim: 256
+
+# Diffusion Process (Optional overrides)
+diffusion:
+  num_timesteps: 1000
+  beta_start: 0.0001
+  beta_end: 0.02
+  schedule: "linear"
