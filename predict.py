@@ -540,6 +540,47 @@ def tensor_to_video(tensor, output_path, fps=30):
     print(f"Video saved to {output_path}")
 
 
+def tensor_to_image(tensor, output_path):
+    """
+    Save tensor as image file (PNG)
+    
+    Args:
+        tensor: Tensor of shape (C, H, W) or (1, C, H, W) or (C, 1, H, W)
+        output_path: Output image file path
+    """
+    # Handle different input shapes
+    if tensor.dim() == 4:
+        # If shape is (1, C, T, H, W) or (B, C, 1, H, W), squeeze
+        if tensor.shape[0] == 1:
+            tensor = tensor.squeeze(0)  # Remove batch dim
+        if tensor.shape[1] == 1:
+            tensor = tensor.squeeze(1)  # Remove time dim if it's 1
+    
+    if tensor.dim() == 4 and tensor.shape[0] == 3:
+        # Shape is (C, 1, H, W)
+        tensor = tensor.squeeze(1)
+    
+    # Now tensor should be (C, H, W)
+    if tensor.dim() != 3:
+        raise ValueError(f"Expected tensor of shape (C, H, W), got {tensor.shape}")
+    
+    # Denormalize from [-1, 1] to [0, 1]
+    tensor = (tensor + 1.0) / 2.0
+    tensor = torch.clamp(tensor, 0, 1)
+    
+    # Convert to numpy: (H, W, C)
+    image_np = tensor.permute(1, 2, 0).cpu().numpy()
+    image_np = (image_np * 255).astype(np.uint8)
+    
+    # Convert RGB to BGR for OpenCV
+    image_bgr = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
+    
+    # Save image
+    cv2.imwrite(str(output_path), image_bgr)
+    print(f"Image saved to {output_path}")
+
+
+
 @torch.no_grad()
 def predict_from_video(
     model,
@@ -553,6 +594,8 @@ def predict_from_video(
 ):
     """
     Predict future frames from a video file
+    
+    If num_future_frames=1, saves as PNG image instead of video.
 
     Args:
         model: Trained diffusion model
@@ -561,7 +604,7 @@ def predict_from_video(
         num_future_frames: Number of future frames to predict
         frame_size: Frame size (H, W)
         frame_interval: Sampling interval between frames
-        output_path: Path to save predicted video
+        output_path: Path to save predicted video/image
         device: Device to run on
     """
     # Load context frames
@@ -576,11 +619,36 @@ def predict_from_video(
     print(f"Context frames shape: {context_frames.shape}")
 
     # Predict future frames
-    print("Generating future frames...")
+    print(f"Generating {num_future_frames} future frame(s)...")
     future_frames = model.predict_video(context_frames, num_future_frames, device)
 
     print(f"Generated frames shape: {future_frames.shape}")
 
+    output_dir = Path(output_path).parent
+    output_name = Path(output_path).stem
+    
+    # If predicting only 1 frame, save as images
+    if num_future_frames == 1:
+        print("\nSaving as images (single frame prediction)...")
+        
+        # Save the predicted frame as image
+        predicted_frame = future_frames[:, :, 0, :, :]  # Get first (only) frame
+        image_path = output_dir / f"{output_name}_predicted.png"
+        tensor_to_image(predicted_frame, image_path)
+        
+        # Also save the last context frame for comparison
+        last_context = context_frames[:, :, -1, :, :]
+        context_path = output_dir / f"{output_name}_last_context.png"
+        tensor_to_image(last_context, context_path)
+        
+        print(f"\n✓ Predicted frame: {image_path}")
+        print(f"✓ Last context frame: {context_path}")
+        
+        return future_frames
+    
+    # Otherwise save as videos (original behavior)
+    print("\nSaving as videos...")
+    
     # Combine context and future frames
     full_video = torch.cat([context_frames, future_frames], dim=2)
 
@@ -588,9 +656,6 @@ def predict_from_video(
     tensor_to_video(full_video, output_path)
 
     # Also save context and prediction separately
-    output_dir = Path(output_path).parent
-    output_name = Path(output_path).stem
-
     tensor_to_video(context_frames, output_dir / f"{output_name}_context.mp4")
     tensor_to_video(future_frames, output_dir / f"{output_name}_prediction.mp4")
 
