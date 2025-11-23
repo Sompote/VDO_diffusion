@@ -385,6 +385,47 @@ class GaussianDiffusion(nn.Module):
         loss = F.mse_loss(predicted_noise, noise)
         return loss
 
+    def p_losses_inpainting(
+        self,
+        context: torch.Tensor,
+        future: torch.Tensor,
+        t: torch.Tensor,
+        noise: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """
+        Calculate loss for inpainting-style conditional prediction training
+        
+        This trains the model to predict future frames given clean context frames.
+        Only the future portion is noised, while context remains clean.
+        
+        Args:
+            context: Clean context frames (B, C, T_context, H, W)
+            future: Clean future frames to predict (B, C, T_future, H, W)
+            t: Timesteps (B,)
+            noise: Optional noise to add to future frames
+            
+        Returns:
+            MSE loss between predicted and actual noise (only for future portion)
+        """
+        if noise is None:
+            noise = torch.randn_like(future)
+        
+        # Add noise only to future frames
+        noisy_future = self.q_sample(future, t, noise)
+        
+        # Concatenate clean context + noisy future
+        mixed_input = torch.cat([context, noisy_future], dim=2)
+        
+        # Predict noise for the full sequence
+        predicted_noise = self.model(mixed_input, t)
+        
+        # Compute loss only on future portion
+        T_context = context.shape[2]
+        future_predicted_noise = predicted_noise[:, :, T_context:, :, :]
+        
+        loss = F.mse_loss(future_predicted_noise, noise)
+        return loss
+
     @torch.no_grad()
     def p_sample(self, x: torch.Tensor, t: int, t_index: int) -> torch.Tensor:
         """

@@ -538,10 +538,23 @@ def train_epoch(model, dataloader, optimizer, device, epoch, writer=None, rank=0
         pbar = dataloader
 
     for batch_idx, batch in enumerate(pbar):
-        videos = combine_video_batch(batch).to(device)
-
-        # Forward pass
-        loss = model(videos)
+        # Check if using VideoPredictionDataset (returns tuple of context, future)
+        if isinstance(batch, (list, tuple)) and len(batch) == 2:
+            # Inpainting-style training for conditional prediction
+            context, future = batch
+            context = context.to(device)
+            future = future.to(device)
+            
+            # Sample timesteps
+            B = context.shape[0]
+            t = torch.randint(0, model.num_timesteps, (B,), device=device).long()
+            
+            # Use inpainting loss
+            loss = model.p_losses_inpainting(context, future, t)
+        else:
+            # Standard training for complete videos
+            videos = combine_video_batch(batch).to(device)
+            loss = model(videos)
 
         # Backward pass
         optimizer.zero_grad()
@@ -585,8 +598,24 @@ def validate(model, dataloader, device, epoch, writer=None, rank=0):
         pbar = dataloader
 
     for batch in pbar:
-        videos = combine_video_batch(batch).to(device)
-        loss = model(videos)
+        # Check if using VideoPredictionDataset (returns tuple of context, future)
+        if isinstance(batch, (list, tuple)) and len(batch) == 2:
+            # Inpainting-style validation
+            context, future = batch
+            context = context.to(device)
+            future = future.to(device)
+            
+            # Sample timesteps
+            B = context.shape[0]
+            t = torch.randint(0, model.num_timesteps, (B,), device=device).long()
+            
+            # Use inpainting loss
+            loss = model.p_losses_inpainting(context, future, t)
+        else:
+            # Standard validation
+            videos = combine_video_batch(batch).to(device)
+            loss = model(videos)
+            
         total_loss += loss.item()
 
         if rank == 0:
