@@ -173,6 +173,7 @@ class VideoDiffusionUNet(nn.Module):
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.time_emb_dim = time_emb_dim
+        self.num_frames = num_frames
 
         # Time embedding
         self.time_mlp = nn.Sequential(
