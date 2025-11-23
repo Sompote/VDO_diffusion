@@ -485,24 +485,12 @@ class GaussianDiffusion(nn.Module):
         """
         B, C, T_context, H, W = context_frames.shape
 
-        # Get model's expected number of frames
-        model_num_frames = self.model.num_frames if hasattr(self.model, 'num_frames') else 16
-
         print(f"Generating {num_future_frames} frames with inpainting-style denoising...")
-        print(f"Model expects {model_num_frames} frames, using {T_context} context frames")
-
-        # Determine how many frames the model will process
-        total_frames = T_context + num_future_frames
-
-        # If total is less than model expects, pad with future frames
-        if total_frames < model_num_frames:
-            future_pad_count = model_num_frames - total_frames
-            print(f"Padding with {future_pad_count} frames to match model's expected input")
-        else:
-            future_pad_count = num_future_frames
+        print(f"Using {T_context} context frames")
 
         # Initialize future frames with pure noise
-        future_noise = torch.randn(B, C, future_pad_count, H, W, device=device)
+        # The model's pad_to_multiple will handle any padding needed
+        future_noise = torch.randn(B, C, num_future_frames, H, W, device=device)
 
         # Denoise using inpainting method (context stays clean, future denoises)
         full_denoised = self._inpaint_denoise(context_frames, future_noise, device)
