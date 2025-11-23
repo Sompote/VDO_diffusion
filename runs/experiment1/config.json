@@ -1,0 +1,40 @@
+{
+    "output_dir": "runs/experiment1",
+    "batch_size": 4,
+    "epochs": 100,
+    "num_frames": 16,
+    "context_frames": 8,
+    "future_frames": 8,
+    "frame_size": [
+        256,
+        171
+    ],
+    "frame_interval": 1,
+    "base_channels": 64,
+    "channel_mults": [
+        1,
+        2,
+        4,
+        8
+    ],
+    "time_emb_dim": 256,
+    "num_timesteps": 1000,
+    "beta_start": 0.0001,
+    "beta_end": 0.02,
+    "schedule": "linear",
+    "lr": 0.0002,
+    "weight_decay": 0.01,
+    "num_workers": 4,
+    "save_interval": 10,
+    "gpus": 1,
+    "train_augment": true,
+    "val_augment": false,
+    "train_dir": "/Users/sompoteyouwai/Downloads/data/train_videos",
+    "val_dir": "/Users/sompoteyouwai/Downloads/data/val_videos",
+    "test_dir": "/Users/sompoteyouwai/Downloads/data/test_videos",
+    "data_config_path": "/Users/sompoteyouwai/Downloads/data/dataset.yaml",
+    "config_path": "config.yaml",
+    "data_names": null,
+    "data_num_classes": null,
+    "resume": null
+}

@@ -516,49 +516,43 @@ class GaussianDiffusion(nn.Module):
     
     @torch.no_grad()
     def _inpaint_denoise(
-        self, 
-        context: torch.Tensor, 
+        self,
+        context: torch.Tensor,
         future_noise: torch.Tensor,
         device: str
     ) -> torch.Tensor:
         """
         Inpainting-style denoising: denoise future frames while preserving context
-        
-        At each timestep:
-        1. Add appropriate noise to context frames
-        2. Denoise the full sequence
-        3. Replace context portion with re-noised original context
-        
+
+        The model was trained with clean context + noisy future at each timestep.
+        At each denoising step:
+        1. Keep context COMPLETELY CLEAN (never noise it)
+        2. Denoise the future portion
+
         This maintains consistency with how the model was trained.
-        
+
         Args:
             context: Clean context frames (B, C, T_context, H, W)
             future_noise: Initial noise for future frames (B, C, T_future, H, W)
             device: Device to run on
-            
+
         Returns:
             Denoised full sequence (B, C, T_context+T_future, H, W)
         """
         T_context = context.shape[2]
-        
+
         # Concatenate context and future
         x = torch.cat([context, future_noise], dim=2)
-        
+
         # Denoise from T to 0
         for i in reversed(range(self.num_timesteps)):
             # Denoise the full sequence
             x = self.p_sample(x, i, i)
-            
-            # Re-noise and replace the context portion to keep it consistent
-            # This prevents context from drifting during denoising
-            if i > 0:  # Don't re-noise at the final step
-                # Add noise to original context at timestep i-1
-                t_tensor = torch.full((context.shape[0],), i-1, device=device, dtype=torch.long)
-                noised_context = self.q_sample(context, t_tensor)
-                
-                # Replace context portion with properly noised context
-                x[:, :, :T_context, :, :] = noised_context
-        
+
+            # CRITICAL: Keep context frames perfectly clean
+            # Replace context portion with original clean context
+            x[:, :, :T_context, :, :] = context
+
         return x
     
     @torch.no_grad()
