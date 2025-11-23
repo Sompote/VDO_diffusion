@@ -55,7 +55,7 @@ class TimestepEmbedding(nn.Module):
         self.mlp = nn.Sequential(
             nn.Linear(dim, hidden_dim),
             nn.SiLU(),
-            nn.Linear(hidden_dim, hidden_dim),
+            nn.Linear(hidden_dim, dim),
         )
 
     def forward(self, t: torch.Tensor) -> torch.Tensor:

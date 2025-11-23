@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.DS_Store
+data/
+runs/
+outputs/
+tmp_demo/
+tmp_runs/
+.claude/
