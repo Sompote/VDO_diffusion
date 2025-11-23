@@ -492,7 +492,7 @@ class GaussianDiffusion(nn.Module):
         current_sequence = context_frames.clone()
         predicted_frames = []
         
-        print(f"Generating {num_future_frames} frames with inpainting-style denoising...")
+        print(f"Generating {num_future_frames} frames autoregressively...")
         print(f"Model expects {model_num_frames} frames, using {T_context} context frames")
         
         # Generate frames one at a time
@@ -515,12 +515,11 @@ class GaussianDiffusion(nn.Module):
             # Initialize future frames with noise
             future_noise = torch.randn(B, C, max(1, pad_frames), H, W, device=device)
             
-            # Denoise with inpainting: preserve context, denoise future
-            denoised = self._inpaint_denoise(
-                context=input_context,
-                future_noise=future_noise,
-                device=device
-            )
+            # Concatenate clean context + noise (matches training)
+            full_sequence = torch.cat([input_context, future_noise], dim=2)
+            
+            # Denoise the full sequence (model learned to denoise future given clean context)
+            denoised = self._sample_from_partial(full_sequence, device)
             
             # Extract the last frame as the predicted next frame
             next_frame = denoised[:, :, -1:, :, :]
