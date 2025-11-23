@@ -203,7 +203,7 @@ def predict(model, args, device):
     # Encode context to latents
     print("Encoding context...")
     # VAE expects (B, C, T, H, W)
-    context_latents = model.vae.encode(context_frames).sample()
+    context_latents = model.vae.encode(context_frames)
     
     # The VAE compresses time by temporal_downsample_factor
     # We need to know how many latent frames correspond to our context
