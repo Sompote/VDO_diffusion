@@ -531,6 +531,21 @@ def train_epoch(model, dataloader, optimizer, device, epoch, writer=None, rank=0
     model.train()
     total_loss = 0.0
     num_batches = len(dataloader)
+    
+    # Detect training mode from first batch
+    training_mode = "unknown"
+    first_batch = next(iter(dataloader))
+    if isinstance(first_batch, (list, tuple)) and len(first_batch) == 2:
+        training_mode = "inpainting (context+future splits)"
+    else:
+        training_mode = "standard (complete videos)"
+    
+    if rank == 0 and epoch == 0:
+        print(f"\n🔧 Training Mode: {training_mode}")
+        if training_mode == "inpainting (context+future splits)":
+            print(f"   Context frames: {first_batch[0].shape[2]}, Future frames: {first_batch[1].shape[2]}")
+        else:
+            print(f"   Total frames: {first_batch.shape[2] if hasattr(first_batch, 'shape') else 'N/A'}")
 
     if rank == 0:
         pbar = tqdm(dataloader, desc=f"Epoch {epoch}")
