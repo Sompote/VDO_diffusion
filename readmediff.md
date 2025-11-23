@@ -102,3 +102,37 @@ python train_advanced.py \
 *   `--use_amp`: **Highly Recommended.** Uses Automatic Mixed Precision (FP16) to save memory and speed up training.
 *   `--use_ema`: Maintains a "shadow" model with smoothed weights for better generation quality.
 *   `--gradient_accumulation_steps`: Simulates larger batch sizes (e.g., set to 4 to simulate batch size 16 if you only have memory for 4).
+
+## 🔮 How to Run Inference (Prediction)
+
+After training, you can generate new videos using `predict_advanced.py`.
+
+### 1. Configure Prediction
+Edit `predict_advanced.yaml` to match your training settings (especially `video` and `vae` sections) and point to your checkpoint.
+
+```yaml
+inference:
+  checkpoint: "./runs/advanced_experiment/final_model.pth"
+  input_video: "./data/val_videos/clip_100.mp4"
+  output_dir: "./outputs/advanced_predictions"
+
+video:
+  num_frames: 6               # Must match training
+  num_context_frames: 5       # How many frames to condition on
+  ...
+```
+
+### 2. Run Prediction
+```bash
+python predict_advanced.py --config predict_advanced.yaml
+```
+
+### 3. Run on Cloud (CLI Override)
+If you are running on a cloud instance and need to specify paths dynamically:
+
+```bash
+python predict_advanced.py \
+    --config predict_advanced.yaml \
+    --checkpoint runs/advanced_experiment/final_model.pth \
+    --input_video data/val_videos/test_clip.mp4
+```
