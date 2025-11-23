@@ -471,9 +471,9 @@ class GaussianDiffusion(nn.Module):
     ) -> torch.Tensor:
         """
         Predict future video frames using inpainting-style denoising
-        
-        This method adds noise to context frames and denoises them together with
-        future frames, maintaining consistency throughout the diffusion process.
+
+        This method keeps context frames clean throughout the diffusion process
+        while denoising future frames, maintaining the conditioning.
 
         Args:
             context_frames: Past frames of shape (B, C, T_context, H, W)
@@ -484,55 +484,35 @@ class GaussianDiffusion(nn.Module):
             Predicted future frames of shape (B, C, num_future_frames, H, W)
         """
         B, C, T_context, H, W = context_frames.shape
-        
+
         # Get model's expected number of frames
         model_num_frames = self.model.num_frames if hasattr(self.model, 'num_frames') else 16
-        
-        # Start with context frames
-        current_sequence = context_frames.clone()
-        predicted_frames = []
-        
-        print(f"Generating {num_future_frames} frames autoregressively...")
+
+        print(f"Generating {num_future_frames} frames with inpainting-style denoising...")
         print(f"Model expects {model_num_frames} frames, using {T_context} context frames")
-        
-        # Generate frames one at a time
-        for frame_idx in range(num_future_frames):
-            # Take last T_context frames as conditioning
-            if current_sequence.shape[2] > T_context:
-                input_context = current_sequence[:, :, -T_context:, :, :]
-            else:
-                input_context = current_sequence
-            
-            # Determine how many frames to generate in this step
-            current_T = input_context.shape[2]
-            if current_T < model_num_frames:
-                pad_frames = model_num_frames - current_T
-            else:
-                # If we have more frames than model expects, take the last model_num_frames
-                input_context = input_context[:, :, -model_num_frames:, :, :]
-                pad_frames = 0
-            
-            # Initialize future frames with noise
-            future_noise = torch.randn(B, C, max(1, pad_frames), H, W, device=device)
-            
-            # Concatenate clean context + noise (matches training)
-            full_sequence = torch.cat([input_context, future_noise], dim=2)
-            
-            # Denoise the full sequence (model learned to denoise future given clean context)
-            denoised = self._sample_from_partial(full_sequence, device)
-            
-            # Extract the last frame as the predicted next frame
-            next_frame = denoised[:, :, -1:, :, :]
-            predicted_frames.append(next_frame)
-            
-            # Append to current sequence for next iteration
-            current_sequence = torch.cat([current_sequence, next_frame], dim=2)
-            
-            if (frame_idx + 1) % 2 == 0 or frame_idx == num_future_frames - 1:
-                print(f"  Generated {frame_idx + 1}/{num_future_frames} frames")
-        
-        # Stack all predicted frames
-        return torch.cat(predicted_frames, dim=2)
+
+        # Determine how many frames the model will process
+        total_frames = T_context + num_future_frames
+
+        # If total is less than model expects, pad with future frames
+        if total_frames < model_num_frames:
+            future_pad_count = model_num_frames - total_frames
+            print(f"Padding with {future_pad_count} frames to match model's expected input")
+        else:
+            future_pad_count = num_future_frames
+
+        # Initialize future frames with pure noise
+        future_noise = torch.randn(B, C, future_pad_count, H, W, device=device)
+
+        # Denoise using inpainting method (context stays clean, future denoises)
+        full_denoised = self._inpaint_denoise(context_frames, future_noise, device)
+
+        # Extract only the number of future frames requested
+        predicted_frames = full_denoised[:, :, T_context:T_context+num_future_frames, :, :]
+
+        print(f"✓ Generated {num_future_frames} frames")
+
+        return predicted_frames
     
     @torch.no_grad()
     def _inpaint_denoise(
