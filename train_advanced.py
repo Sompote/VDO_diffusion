@@ -265,6 +265,7 @@ def train_single_gpu(args):
         latent_channels=args.latent_channels,
         base_channels=args.vae_base_channels,
         channel_mults=tuple(args.vae_channel_mults),
+        temporal_downsample=tuple(bool(x) for x in args.vae_temporal_downsample),
         spatial_downsample_factor=args.spatial_downsample,
         temporal_downsample_factor=args.temporal_downsample,
     )
@@ -498,6 +499,13 @@ def main():
     )
     parser.add_argument(
         "--temporal_downsample", type=int, default=4, help="Temporal downsample factor"
+    )
+    parser.add_argument(
+        "--vae_temporal_downsample",
+        type=int,
+        nargs="+",
+        default=[0, 1, 1, 0],
+        help="VAE temporal downsample layers (0=False, 1=True)",
     )
 
     # DiT parameters
