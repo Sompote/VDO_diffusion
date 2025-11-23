@@ -214,12 +214,20 @@ def resolve_inference_namespace(args: argparse.Namespace) -> SimpleNamespace:
         get_nested(config_data, ("video", "num_frames")),
         data_mapping.get("num_frames"),
     )
+    
+    print(f"DEBUG: num_frames_override initial: {num_frames_override}")
+    print(f"DEBUG: context_frames: {context_frames}")
+    print(f"DEBUG: future_frames: {future_frames}")
+    
     if (
         num_frames_override is None
         and context_frames is not None
         and future_frames is not None
     ):
         num_frames_override = int(context_frames) + int(future_frames)
+        print(f"DEBUG: Calculated num_frames from context+future: {num_frames_override}")
+    
+    print(f"DEBUG: Final num_frames_override: {num_frames_override}")
 
     frame_size_value = first_non_none(
         args.frame_size,
