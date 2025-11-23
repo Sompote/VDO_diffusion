@@ -238,7 +238,10 @@ def resolve_inference_namespace(args: argparse.Namespace) -> SimpleNamespace:
         or config_data.get("device")
         or DEFAULT_RUNTIME_CFG["device"],
         "mode": args.mode,
-        "input_video": args.input_video,
+        "input_video": first_non_none(
+            args.input_video,
+            get_nested(config_data, ("inference", "input_video")),
+        ),
         "context_frames": int(context_frames)
         if context_frames is not None
         else DEFAULT_RUNTIME_CFG["context_frames"],
