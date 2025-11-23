@@ -444,12 +444,22 @@ def train_single_gpu(args):
     print("\nTraining completed!")
 
 
+import yaml
+
+def load_yaml_config(config_path):
+    """Load YAML config file"""
+    with open(config_path, 'r') as f:
+        return yaml.safe_load(f)
+
 def main():
     parser = argparse.ArgumentParser(description="Train Advanced Video Diffusion Model")
 
+    # Config file
+    parser.add_argument("--config", type=str, help="Path to YAML configuration file")
+
     # Data parameters
     parser.add_argument(
-        "--train_dir", type=str, required=True, help="Training video directory"
+        "--train_dir", type=str, help="Training video directory"
     )
     parser.add_argument(
         "--val_dir", type=str, default=None, help="Validation video directory"
@@ -592,6 +602,79 @@ def main():
     parser.add_argument("--gpus", type=int, default=1, help="Number of GPUs to use")
 
     args = parser.parse_args()
+
+    # Load config if specified
+    if args.config:
+        print(f"Loading configuration from {args.config}")
+        config = load_yaml_config(args.config)
+        
+        # Update args with config values if not specified in CLI
+        # Note: CLI args should take precedence, but argparse sets defaults.
+        # To handle this properly, we can check if the arg was explicitly set or use the config value.
+        # A simpler approach for this script: Overwrite args with config values, 
+        # but keep CLI args if they were explicitly provided (harder to track).
+        # OR: Just update args with config values, effectively making config values override defaults,
+        # but CLI args passed *after* config loading would need to be handled carefully.
+        # 
+        # Standard pattern: Config file provides defaults/values, CLI overrides everything.
+        # Since argparse defaults are already set, we need to know what was passed.
+        # We'll use set_defaults on the parser with the config values.
+        
+        # Flatten config if it's nested (optional, but good for organization)
+        # For now, let's assume a flat config or simple sections matching arg names.
+        
+        # Helper to flatten dictionary
+        def flatten_config(cfg, parent_key='', sep='_'):
+            items = []
+            for k, v in cfg.items():
+                new_key = f"{parent_key}{sep}{k}" if parent_key else k
+                if isinstance(v, dict):
+                    items.extend(flatten_config(v, new_key, sep=sep).items())
+                else:
+                    items.append((new_key, v))
+            return dict(items)
+
+        # If the user uses sections like "data: train_dir: ...", we flatten it to "data_train_dir" 
+        # but our args are just "train_dir". So we should probably support a flat structure 
+        # or a specific structure matching our args.
+        # Let's support a structured yaml that maps to our args.
+        
+        # We will iterate over the config and set attributes on args if they exist
+        # But to allow CLI override, we should parse args again or use a different strategy.
+        # Strategy: Load config, create a dict, update with non-default CLI args.
+        # Actually, easiest way:
+        # 1. Parse args (to get config path)
+        # 2. Load config
+        # 3. Set defaults of parser using config
+        # 4. Re-parse args
+        
+        parser.set_defaults(**config)
+        
+        # If config has nested structure (e.g. "data": {"train_dir": ...}), we need to flatten it or extract it.
+        # Let's assume the user will use a flat config matching arg names for simplicity, 
+        # OR we map sections.
+        
+        # Let's support the sections from the example config we will create.
+        # Sections: data, video, vae, dit, diffusion, training, system
+        
+        flat_config = {}
+        for key, value in config.items():
+            if isinstance(value, dict):
+                for sub_key, sub_value in value.items():
+                    # Check if the key matches an argument directly (e.g. "train_dir")
+                    if sub_key in args.__dict__:
+                        flat_config[sub_key] = sub_value
+                    # Or if it matches with section prefix? No, let's stick to direct names.
+            else:
+                if key in args.__dict__:
+                    flat_config[key] = value
+        
+        parser.set_defaults(**flat_config)
+        args = parser.parse_args()
+
+    # Validate required args
+    if args.train_dir is None:
+        parser.error("--train_dir is required (either via CLI or config file)")
 
     # Launch training
     if args.gpus > 1:

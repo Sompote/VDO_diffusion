@@ -1,0 +1,43 @@
+ # Example training configuration for Video Diffusion Model
+# Copy this file and modify for your experiments.
+
+# Output folder management
+output:
+  project: "./runs"          # Base directory where experiment folders will be created
+  name: "experiment1"        # Sub-directory for this specific run
+
+# Video clip settings
+video:
+  frame_size: [256, 256]     # Height and width of frames
+  frame_interval: 1          # Sample every Nth frame from source videos
+
+# Model architecture parameters
+model:
+  base_channels: 64
+  channel_mults: [1, 2, 4, 8]
+  time_emb_dim: 256
+
+# Diffusion process configuration
+diffusion:
+  num_timesteps: 1000
+  beta_start: 0.0001
+  beta_end: 0.02
+  schedule: "linear"         # Alternatives: ["linear", "cosine"]
+
+# Optimisation and training schedule
+training:
+  batch_size: 2
+  epochs: 100
+  lr: 0.0002
+  weight_decay: 0.01
+  num_workers: 4
+  save_interval: 10
+
+# Multi-GPU preferences
+gpu:
+  gpus: 1                    # Set to the number of GPUs available
+
+# Sequence formatting for prediction tasks
+prediction:
+  num_context_frames: 8      # Frames given to the model as input
+  num_future_frames: 1      # Frames the model should predict

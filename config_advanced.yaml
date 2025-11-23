@@ -1,0 +1,58 @@
+# Advanced Video Diffusion Training Configuration
+# Usage: python train_advanced.py --config config_advanced.yaml
+
+# Data Configuration
+data:
+  train_dir: "./data/train_videos"
+  val_dir: "./data/val_videos"
+  output_dir: "./runs/advanced_experiment"
+
+# Video Settings
+video:
+  num_frames: 16              # Total frames per clip
+  frame_size: [256, 256]      # Height Width
+  frame_interval: 1           # Sample every Nth frame
+
+# VAE (Video Autoencoder) Settings
+vae:
+  latent_channels: 4
+  vae_base_channels: 128
+  vae_channel_mults: [1, 2, 4, 4]
+  spatial_downsample: 8       # 256 -> 32
+  temporal_downsample: 4      # 16 -> 4
+
+# DiT (Diffusion Transformer) Architecture
+dit:
+  patch_size: [2, 2]
+  hidden_dim: 768
+  depth: 12                   # Number of transformer blocks
+  num_heads: 12
+  dim_head: 64
+  ff_mult: 4
+  dropout: 0.0
+
+# Diffusion Process
+diffusion:
+  num_timesteps: 1000
+  beta_schedule: "cosine"     # "linear", "cosine", "sigmoid"
+  prediction_type: "v"        # "v" (recommended), "eps", "x0"
+  guidance_scale: 7.5         # Classifier-free guidance scale
+  p_uncond: 0.1               # Probability of unconditional training
+
+# Training Hyperparameters
+training:
+  batch_size: 4               # Batch size per GPU
+  epochs: 100
+  lr: 0.0001                  # 1e-4
+  lr_schedule: "cosine"
+  weight_decay: 0.01
+  gradient_accumulation_steps: 1
+  use_amp: true               # Automatic Mixed Precision (Recommended)
+  use_ema: true               # Exponential Moving Average (Recommended)
+  ema_decay: 0.9999
+
+# System Settings
+system:
+  num_workers: 4
+  save_interval: 10
+  gpus: 1
