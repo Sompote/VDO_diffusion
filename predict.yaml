@@ -3,8 +3,8 @@
 
 # Inference Settings
 inference:
-  checkpoint: "./runs/experiment/checkpoint_latest.pth"
-  input_video: "./data/val_videos/clip_100.mp4" # Can be a video file OR a directory of images
+  checkpoint: "./runs/experiment1/best_model.pth"
+  input_video: "./data/test_videos/drive_0003" # Can be a video file OR a directory of images
   output_dir: "./outputs/predictions"
   output_name: "prediction_result"
   device: "cuda"  # or "cpu"
@@ -12,8 +12,7 @@ inference:
 
 # Video Settings (Must match training)
 video:
-  num_frames: 16              # Total frames per clip
-  frame_size: [64, 64]        # Height Width (Basic model usually uses smaller size)
+  frame_size: [256, 171]      # Height Width - MUST match training data!
   frame_interval: 1           # Sample every Nth frame
 
 # Prediction Settings
@@ -21,15 +20,6 @@ prediction:
   num_context_frames: 8       # Number of frames to condition on
   num_future_frames: 1        # Number of future frames to predict (1 = save as image)
 
-# Model Architecture (Optional overrides, usually loaded from checkpoint)
-model:
-  base_channels: 64
-  channel_mults: [1, 2, 4, 8]
-  time_emb_dim: 256
-
-# Diffusion Process (Optional overrides)
-diffusion:
-  num_timesteps: 1000
-  beta_start: 0.0001
-  beta_end: 0.02
-  schedule: "linear"
+# NOTE: DO NOT override model and diffusion settings here!
+# They are automatically loaded from the checkpoint's config.json
+# to ensure perfect alignment with what was trained
