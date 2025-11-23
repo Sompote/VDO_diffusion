@@ -130,6 +130,7 @@ def load_model(args, device):
         latent_channels=args.latent_channels,
         base_channels=args.vae_base_channels,
         channel_mults=tuple(args.vae_channel_mults),
+        temporal_downsample=tuple(bool(x) for x in args.vae_temporal_downsample),
         spatial_downsample_factor=args.spatial_downsample,
         temporal_downsample_factor=args.temporal_downsample,
     )
