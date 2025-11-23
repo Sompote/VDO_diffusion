@@ -429,7 +429,10 @@ class GaussianDiffusion(nn.Module):
         self, context_frames: torch.Tensor, num_future_frames: int, device: str = "cuda"
     ) -> torch.Tensor:
         """
-        Predict future video frames given context frames
+        Predict future video frames autoregressively using sliding window
+        
+        This method generates frames one at a time to work with models trained
+        on complete video sequences (not specifically for conditional prediction).
 
         Args:
             context_frames: Past frames of shape (B, C, T_context, H, W)
@@ -440,19 +443,66 @@ class GaussianDiffusion(nn.Module):
             Predicted future frames of shape (B, C, num_future_frames, H, W)
         """
         B, C, T_context, H, W = context_frames.shape
-
-        # Initialize with noise for future frames
-        future_frames = torch.randn(B, C, num_future_frames, H, W, device=device)
-
-        # Concatenate context and future frames
-        full_video = torch.cat([context_frames, future_frames], dim=2)
-
-        # Denoise only the future frames using the diffusion process
+        
+        # Get model's expected number of frames
+        model_num_frames = self.model.num_frames if hasattr(self.model, 'num_frames') else 16
+        
+        # Start with context frames
+        current_sequence = context_frames.clone()
+        predicted_frames = []
+        
+        print(f"Generating {num_future_frames} frames autoregressively...")
+        
+        # Generate frames one at a time
+        for frame_idx in range(num_future_frames):
+            # Take last T_context frames as conditioning
+            if current_sequence.shape[2] > T_context:
+                input_frames = current_sequence[:, :, -T_context:, :, :]
+            else:
+                input_frames = current_sequence
+            
+            # Pad to model's expected num_frames with noise
+            current_T = input_frames.shape[2]
+            if current_T < model_num_frames:
+                pad_frames = model_num_frames - current_T
+                noise = torch.randn(B, C, pad_frames, H, W, device=device)
+                full_sequence = torch.cat([input_frames, noise], dim=2)
+            else:
+                # If we have more frames than model expects, take the last model_num_frames
+                full_sequence = input_frames[:, :, -model_num_frames:, :, :]
+            
+            # Denoise the full sequence
+            denoised = self._sample_from_partial(full_sequence, device)
+            
+            # Extract the next predicted frame (first frame after context)
+            next_frame = denoised[:, :, T_context:T_context+1, :, :]
+            predicted_frames.append(next_frame)
+            
+            # Append to current sequence for next iteration
+            current_sequence = torch.cat([current_sequence, next_frame], dim=2)
+            
+            if (frame_idx + 1) % 2 == 0 or frame_idx == num_future_frames - 1:
+                print(f"  Generated {frame_idx + 1}/{num_future_frames} frames")
+        
+        # Stack all predicted frames
+        return torch.cat(predicted_frames, dim=2)
+    
+    @torch.no_grad()
+    def _sample_from_partial(self, x: torch.Tensor, device: str) -> torch.Tensor:
+        """
+        Denoise a video sequence through the full diffusion process
+        Helper method for autoregressive prediction
+        
+        Args:
+            x: Input tensor of shape (B, C, T, H, W)
+            device: Device to run on
+            
+        Returns:
+            Denoised tensor of same shape
+        """
         for i in reversed(range(self.num_timesteps)):
-            full_video = self.p_sample(full_video, i, i)
-
-        # Return only the predicted future frames
-        return full_video[:, :, T_context:, :, :]
+            x = self.p_sample(x, i, i)
+        return x
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
