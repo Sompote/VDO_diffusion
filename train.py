@@ -708,34 +708,27 @@ def train_single_gpu(args):
                 save_checkpoint(
                     model, optimizer, epoch, val_loss, args.output_dir, "best_model.pth"
                 )
+                print(f"✓ Saved best model (val_loss: {val_loss:.4f})")
 
-        # Save checkpoint
-        if (epoch + 1) % args.save_interval == 0:
-            save_checkpoint(
-                model,
-                optimizer,
-                epoch,
-                train_loss,
-                args.output_dir,
-                f"checkpoint_epoch_{epoch}.pth",
-            )
+        # Always save latest checkpoint (overwrites previous)
+        save_checkpoint(
+            model,
+            optimizer,
+            epoch,
+            train_loss,
+            args.output_dir,
+            "latest_checkpoint.pth",
+        )
 
         # Update learning rate
         scheduler.step()
         writer.add_scalar("train/lr", scheduler.get_last_lr()[0], epoch)
 
-    # Save final model
-    save_checkpoint(
-        model,
-        optimizer,
-        args.epochs - 1,
-        train_loss,
-        args.output_dir,
-        "final_model.pth",
-    )
     writer.close()
 
     print("\nTraining completed!")
+    print(f"Best model saved at: {Path(args.output_dir) / 'best_model.pth'}")
+    print(f"Latest checkpoint saved at: {Path(args.output_dir) / 'latest_checkpoint.pth'}")
 
 
 def train_multi_gpu(rank, world_size, args):
@@ -840,35 +833,28 @@ def train_multi_gpu(rank, world_size, args):
                         args.output_dir,
                         "best_model.pth",
                     )
+                    print(f"✓ Saved best model (val_loss: {val_loss:.4f})")
 
-            # Save checkpoint
-            if (epoch + 1) % args.save_interval == 0:
-                save_checkpoint(
-                    model.module,
-                    optimizer,
-                    epoch,
-                    train_loss,
-                    args.output_dir,
-                    f"checkpoint_epoch_{epoch}.pth",
-                )
+            # Always save latest checkpoint (overwrites previous)
+            save_checkpoint(
+                model.module,
+                optimizer,
+                epoch,
+                train_loss,
+                args.output_dir,
+                "latest_checkpoint.pth",
+            )
 
         # Update learning rate
         scheduler.step()
         if rank == 0 and writer is not None:
             writer.add_scalar("train/lr", scheduler.get_last_lr()[0], epoch)
 
-    # Save final model
     if rank == 0:
-        save_checkpoint(
-            model.module,
-            optimizer,
-            args.epochs - 1,
-            train_loss,
-            args.output_dir,
-            "final_model.pth",
-        )
         writer.close()
         print("\nTraining completed!")
+        print(f"Best model saved at: {Path(args.output_dir) / 'best_model.pth'}")
+        print(f"Latest checkpoint saved at: {Path(args.output_dir) / 'latest_checkpoint.pth'}")
 
     cleanup_ddp()
 
