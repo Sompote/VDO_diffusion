@@ -40,6 +40,7 @@ dit:
 # Diffusion Process
 diffusion:
   num_timesteps: 1000
+  num_inference_steps: 100    # DDIM sampling steps (25/50/100/200 - higher = better quality but slower)
   beta_schedule: "cosine"
   prediction_type: "v"
   guidance_scale: 1.0         # Reduced from 7.5 to avoid noise amplification. Use 1.0 for unconditional sampling

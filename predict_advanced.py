@@ -230,7 +230,8 @@ def predict(model, args, device):
     
     # Sampling loop (DDIM style from model.sample)
     # Use fewer steps for faster inference (DDIM allows fewer steps than training timesteps)
-    num_steps = min(100, args.num_timesteps)  # Use 100 DDIM steps for quality balance
+    num_steps = getattr(args, 'num_inference_steps', 100)  # Default to 100 if not specified
+    num_steps = min(num_steps, args.num_timesteps)
     timesteps = torch.linspace(args.num_timesteps - 1, 0, num_steps, dtype=torch.long, device=device)
     
     for i, t in enumerate(timesteps):
