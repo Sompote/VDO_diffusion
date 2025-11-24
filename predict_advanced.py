@@ -229,8 +229,9 @@ def predict(model, args, device):
     z = torch.randn(shape, device=device)
     
     # Sampling loop (DDIM style from model.sample)
-    num_steps = args.num_timesteps
-    timesteps = torch.linspace(num_steps - 1, 0, num_steps, dtype=torch.long, device=device)
+    # Use fewer steps for faster inference (DDIM allows fewer steps than training timesteps)
+    num_steps = min(50, args.num_timesteps)  # Use 50 DDIM steps for quality balance
+    timesteps = torch.linspace(args.num_timesteps - 1, 0, num_steps, dtype=torch.long, device=device)
     
     for i, t in enumerate(timesteps):
         t_batch = t.expand(shape[0]).to(device)
