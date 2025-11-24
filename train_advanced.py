@@ -421,7 +421,7 @@ def train_single_gpu(args):
                 epoch,
                 train_loss,
                 args.output_dir,
-                f"checkpoint_epoch_{epoch}.pth",
+                "checkpoint_latest.pth",
             )
 
         # Update learning rate
