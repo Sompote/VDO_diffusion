@@ -29,7 +29,7 @@ vae:
 # DiT Architecture (Must match training)
 dit:
   patch_size: [2, 2]
-  hidden_dim: 512
+  hidden_dim: 768
   depth: 12
   num_heads: 12
   dim_head: 64
