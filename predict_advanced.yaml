@@ -12,8 +12,8 @@ inference:
 # Video Settings (Must match training)
 # Video Settings (Must match training)
 video:
-  num_frames: 16              # Total frames to generate (5 context + future frames)
-  num_context_frames: 5       # Number of frames to condition on
+  num_frames: 6             # Total frames to generate (5 context + future frames)
+  num_context_frames: 4       # Number of frames to condition on
   frame_size: [256, 256]      # Height Width
   frame_interval: 1           # Sample every Nth frame
 

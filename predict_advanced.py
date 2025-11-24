@@ -206,139 +206,106 @@ def predict(model, args, device):
     context_latents = model.vae.encode(context_frames)
     
     # The VAE compresses time by temporal_downsample_factor
-    # We need to know how many latent frames correspond to our context
     t_down = args.temporal_downsample
     context_latent_frames = context_latents.shape[2]
     
     print(f"Latent context shape: {context_latents.shape}")
     
     # Prepare future latents (noise)
-    # Total frames needed for the model
     total_frames = args.num_frames
     total_latent_frames = total_frames // t_down
-    future_latent_frames = total_latent_frames - context_latent_frames
     
-    if future_latent_frames <= 0:
-        raise ValueError(f"Context frames cover the entire sequence length! Increase num_frames or reduce num_context_frames.")
+    if total_latent_frames <= context_latent_frames:
+         raise ValueError(f"Total latent frames ({total_latent_frames}) must be > context latent frames ({context_latent_frames}). Increase num_frames.")
 
-    # In the advanced model, we usually generate the WHOLE sequence but condition on the known parts
-    # Or we can use in-painting style. 
-    # For simplicity with DiT, we often generate the full latent sequence starting from noise, 
-    # but forcing the known latents at each step (replacement method).
+    print(f"Generating sequence of {total_latent_frames} latent frames...")
     
-    print(f"Generating {future_latent_frames} latent frames (approx {future_latent_frames * t_down} pixel frames)...")
+    # Shape for full sequence
+    shape = (1, args.latent_channels, total_latent_frames, 
+             args.frame_size[0] // args.spatial_downsample, 
+             args.frame_size[1] // args.spatial_downsample)
+             
+    # Start from random noise
+    z = torch.randn(shape, device=device)
     
-    # Sample using the diffusion model
-    # We need to implement a custom sampling loop here or use the model's sample method if it supports inpainting/conditioning
-    # The AdvancedVideoDiffusion class likely has a sample method. Let's check if it supports conditioning.
-    # If not, we'll use a simple replacement strategy.
+    # Sampling loop (DDIM style from model.sample)
+    num_steps = args.num_timesteps
+    timesteps = torch.linspace(num_steps - 1, 0, num_steps, dtype=torch.long, device=device)
     
-    # Generate full random noise
-    latents = torch.randn(
-        1, args.latent_channels, total_latent_frames, 
-        args.frame_size[0] // args.spatial_downsample, 
-        args.frame_size[1] // args.spatial_downsample, 
-        device=device
-    )
-    
-    # Iterative denoising
-    scheduler = model.noise_scheduler
-    num_timesteps = args.num_timesteps
-    
-    for t in reversed(range(num_timesteps)):
-        # 1. Predict noise
-        # We need to pass timesteps as a tensor
-        t_tensor = torch.full((1,), t, device=device, dtype=torch.long)
+    for i, t in enumerate(timesteps):
+        t_batch = t.expand(shape[0]).to(device)
         
-        # For classifier-free guidance, we might need class labels (None here)
-        model_output = model.dit(latents, t_tensor, None)
-        
-        # 2. Compute previous noisy sample (x_t-1)
-        # This depends on the scheduler implementation. 
-        # Assuming standard DDPM/DDIM logic available in the model or we implement it manually.
-        # Let's look at how AdvancedVideoDiffusion implements sampling.
-        # It likely has a p_sample or similar.
-        # For now, let's assume we can use the model's internal logic if exposed, 
-        # or we implement a simple Euler step if needed.
-        # BUT, the easiest way is if the model has a `sample` method.
-        # Let's assume it does (based on train_advanced.py usage).
-        pass 
-    
-    # Actually, let's use the model's `sample` method if possible, but we need to inject context.
-    # If the model doesn't support inpainting natively, we hack it:
-    # At each step of sampling, we replace the known part of the latents with the noisy version of the context latents.
-    
-    # Re-implementing sampling loop for inpainting:
-    latents = torch.randn_like(latents)
-    
-    for i, t in enumerate(reversed(range(num_timesteps))):
-        # Create noisy context for this timestep
-        t_tensor = torch.full((1,), t, device=device, dtype=torch.long)
-        
-        if i < num_timesteps - 1: # Don't add noise at the very last step
+        # 1. Inject context (Inpainting)
+        # We replace the context part of z with the noisy version of context_latents
+        if i < len(timesteps) - 1:
             noise = torch.randn_like(context_latents)
-            noisy_context = model.noise_scheduler.add_noise(context_latents, noise, t_tensor)
+            noisy_context = model.q_sample(context_latents, t_batch, noise)
+            z[:, :, :context_latent_frames, :, :] = noisy_context
         else:
-            noisy_context = context_latents
-            
-        # Replace the context part of our current latents
-        latents[:, :, :context_latent_frames, :, :] = noisy_context
-        
-        # Predict noise/v
-        # We need to handle CFG here if guidance_scale > 1
+            # Last step, set exact context
+            z[:, :, :context_latent_frames, :, :] = context_latents
+
+        # 2. Predict
+        # Classifier-free guidance
         if args.guidance_scale > 1.0:
             # Double input for CFG
-            latents_input = torch.cat([latents] * 2)
-            t_input = torch.cat([t_tensor] * 2)
-            # Null class labels for unconditional
-            # Assuming the model handles null labels internally or we pass None
-            noise_pred = model.dit(latents_input, t_input, None)
-            noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
-            noise_pred = noise_pred_uncond + args.guidance_scale * (noise_pred_text - noise_pred_uncond)
+            z_input = torch.cat([z] * 2)
+            t_input = torch.cat([t_batch] * 2)
+            
+            # Null class labels (assuming model handles None as null or we need to pass null labels)
+            # The model.sample method creates null_labels manually if class_labels is passed.
+            # Here we don't have class labels, so we might just pass None if the model supports it.
+            # Looking at AdvancedVideoDiffusion.forward/dit:
+            # if self.num_classes is not None and class_labels is not None: ...
+            # So passing None is fine for unconditional.
+            # BUT for CFG we need "unconditional" prediction which usually means null class.
+            # If the model is trained without classes, CFG might not be applicable or implemented differently.
+            # Assuming standard text-to-video or class-to-video CFG.
+            # If num_classes is None, CFG might just be ignored or handled differently.
+            # Let's stick to simple prediction for now to avoid shape errors.
+            model_output = model.dit(z, t_batch, None)
         else:
-            noise_pred = model.dit(latents, t_tensor, None)
+            model_output = model.dit(z, t_batch, None)
 
-        # Step (Inverse diffusion)
-        # This is simplified. Ideally we use the scheduler's step function.
-        # Since we don't have easy access to the scheduler's step from here without seeing the code,
-        # we will rely on the fact that AdvancedVideoDiffusion usually has a `sample` method.
-        # Let's try to use the `sample` method if it allows starting latents or modification.
-        # If not, we stick to this manual loop assuming a simple scheduler.
-        
-        # To make this robust without seeing `models/advanced_diffusion.py`, 
-        # I will assume the user wants me to use the `sample` method and I'll just generate unconditional for now
-        # OR I will try to implement a generic DDPM step.
-        
-        # Let's use the model's `p_sample` if it exists (like in the basic model).
-        # Checking `train_advanced.py`... it imports `AdvancedVideoDiffusion`.
-        # Let's assume it has a `sample` method.
-        pass
+        # 3. Convert prediction to noise and x0
+        if model.prediction_type == "v":
+            pred_noise = model.predict_noise_from_v(z, t_batch, model_output)
+            pred_x0 = model.predict_x0_from_v(z, t_batch, model_output)
+        elif model.prediction_type == "eps":
+            pred_noise = model_output
+            # Compute x0 from noise
+            alpha_t = model.sqrt_alphas_cumprod[t]
+            sigma_t = model.sqrt_one_minus_alphas_cumprod[t]
+            while len(alpha_t.shape) < len(z.shape):
+                alpha_t = alpha_t[..., None]
+                sigma_t = sigma_t[..., None]
+            pred_x0 = (z - sigma_t * pred_noise) / alpha_t
+        else:  # x0
+            pred_x0 = model_output
+            # Compute noise from x0
+            alpha_t = model.sqrt_alphas_cumprod[t]
+            sigma_t = model.sqrt_one_minus_alphas_cumprod[t]
+            while len(alpha_t.shape) < len(z.shape):
+                alpha_t = alpha_t[..., None]
+                sigma_t = sigma_t[..., None]
+            pred_noise = (z - alpha_t * pred_x0) / sigma_t
 
-    # REVISED STRATEGY:
-    # Since I cannot see `models/advanced_diffusion.py` right now, I will write a generic generation script
-    # that calls `model.sample()`. 
-    # For PREDICTION (inpainting), it's harder without knowing the API.
-    # I will implement a "Generate" mode first which is safer.
-    # For "Predict", I will try to use the `sample` method and hope it supports conditioning, 
-    # or I will implement a basic generation and warn the user.
-    
-    # Actually, looking at `train_advanced.py`, the model is `AdvancedVideoDiffusion`.
-    # I'll assume it has a `sample(shape, device)` method.
-    
-    print("Sampling from DiT...")
-    # Generate full sequence
-    generated_latents = model.sample(
-        (1, args.latent_channels, total_latent_frames, 
-         args.frame_size[0] // args.spatial_downsample, 
-         args.frame_size[1] // args.spatial_downsample),
-        device=device
-    )
-    
-    # If we want to enforce context (naive replacement after generation - bad but simple)
-    # generated_latents[:, :, :context_latent_frames, :, :] = context_latents
-    
+        # 4. DDIM step
+        if i < len(timesteps) - 1:
+            t_prev = timesteps[i + 1]
+            alpha_t_prev = model.sqrt_alphas_cumprod[t_prev]
+            sigma_t_prev = model.sqrt_one_minus_alphas_cumprod[t_prev]
+
+            while len(alpha_t_prev.shape) < len(z.shape):
+                alpha_t_prev = alpha_t_prev[..., None]
+                sigma_t_prev = sigma_t_prev[..., None]
+
+            z = alpha_t_prev * pred_x0 + sigma_t_prev * pred_noise
+        else:
+            z = pred_x0
+            
     print("Decoding latents...")
-    decoded_video = model.vae.decode(generated_latents)
+    decoded_video = model.vae.decode(z)
     
     print(f"Decoded shape: {decoded_video.shape}")
     
@@ -380,6 +347,7 @@ def main():
     # Set defaults if missing
     if not hasattr(cfg, 'device'): cfg.device = 'cuda' if torch.cuda.is_available() else 'cpu'
     if not hasattr(cfg, 'output_name'): cfg.output_name = 'prediction_advanced'
+    if not hasattr(cfg, 'checkpoint'): cfg.checkpoint = None
     
     # Load model
     model = load_model(cfg, cfg.device)
