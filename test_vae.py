@@ -108,7 +108,7 @@ def process_video(model, video_path, device):
     save_frame(recon, "test_reconstruction.png")
 
 if __name__ == "__main__":
-    parser = argparse.argument_parser()
+    parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="predict_advanced.yaml")
     args = parser.parse_args()
     
