@@ -442,7 +442,7 @@ class VideoVAE3D(nn.Module):
         eps = torch.randn_like(std)
         z = mean + eps * std
 
-        return z
+        return z, mean, logvar
 
     def decode(self, z: torch.Tensor) -> torch.Tensor:
         """Decode from latent"""
@@ -455,9 +455,9 @@ class VideoVAE3D(nn.Module):
 
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """Full VAE forward pass"""
-        z = self.encode(x)
+        z, mean, logvar = self.encode(x)
         recon = self.decode(z)
-        return recon, z
+        return recon, z, mean, logvar
 
 
 class LatentVideoDiT(nn.Module):
@@ -646,6 +646,8 @@ class AdvancedVideoDiffusion(nn.Module):
         prediction_type: str = "v",  # 'eps', 'x0', or 'v'
         guidance_scale: float = 7.5,
         p_uncond: float = 0.1,  # Probability of unconditional training
+        vae_loss_weight: float = 1.0,
+        kl_loss_weight: float = 1e-6,
     ):
         super().__init__()
 
@@ -655,6 +657,8 @@ class AdvancedVideoDiffusion(nn.Module):
         self.prediction_type = prediction_type
         self.guidance_scale = guidance_scale
         self.p_uncond = p_uncond
+        self.vae_loss_weight = vae_loss_weight
+        self.kl_loss_weight = kl_loss_weight
 
         # Create noise schedule
         if beta_schedule == "linear":
@@ -707,7 +711,8 @@ class AdvancedVideoDiffusion(nn.Module):
     @torch.no_grad()
     def encode_to_latent(self, x: torch.Tensor) -> torch.Tensor:
         """Encode video to latent space"""
-        return self.vae.encode(x)
+        z, _, _ = self.vae.encode(x)
+        return z
 
     @torch.no_grad()
     def decode_from_latent(self, z: torch.Tensor) -> torch.Tensor:
@@ -787,9 +792,20 @@ class AdvancedVideoDiffusion(nn.Module):
         B = x.shape[0]
         device = x.device
 
-        # Encode to latent
-        with torch.no_grad():
-            z = self.encode_to_latent(x)
+        # Encode to latent (with gradients!)
+        z, mean, logvar = self.vae.encode(x)
+
+        # VAE Reconstruction Loss
+        # We need to decode to compute reconstruction loss
+        # To save memory, we can decode a subset or the whole batch depending on memory constraints
+        # For now, let's decode the whole batch
+        recon_x = self.vae.decode(z)
+        recon_loss = F.mse_loss(recon_x, x)
+
+        # VAE KL Divergence Loss
+        # KL(N(mean, std) || N(0, 1)) = -0.5 * sum(1 + log(std^2) - mean^2 - std^2)
+        kl_loss = -0.5 * torch.sum(1 + logvar - mean.pow(2) - logvar.exp())
+        kl_loss = kl_loss / (B * x.shape[1] * x.shape[2] * x.shape[3] * x.shape[4]) # Normalize
 
         # Sample timesteps
         t = torch.randint(0, self.num_timesteps, (B,), device=device).long()
@@ -819,9 +835,12 @@ class AdvancedVideoDiffusion(nn.Module):
         else:
             raise ValueError(f"Unknown prediction type: {self.prediction_type}")
 
-        loss = F.mse_loss(model_output, target)
+        diff_loss = F.mse_loss(model_output, target)
+        
+        # Total loss
+        total_loss = diff_loss + self.vae_loss_weight * recon_loss + self.kl_loss_weight * kl_loss
 
-        return loss
+        return total_loss, diff_loss, recon_loss, kl_loss
 
     @torch.no_grad()
     def sample(

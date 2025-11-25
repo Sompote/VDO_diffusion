@@ -170,7 +170,7 @@ def train_epoch(
             else:
                 class_labels = None
 
-            loss = model(videos, class_labels)
+            loss, diff_loss, recon_loss, kl_loss = model(videos, class_labels)
             loss = loss / accum_steps
 
         # Backward pass with gradient scaling
@@ -199,13 +199,27 @@ def train_epoch(
 
         # Update progress bar
         if rank == 0:
-            pbar.set_postfix({"loss": loss.item() * accum_steps})
+            pbar.set_postfix({
+                "loss": loss.item() * accum_steps,
+                "diff": diff_loss.item(),
+                "recon": recon_loss.item(),
+                "kl": kl_loss.item()
+            })
 
             # Log to tensorboard
             if writer is not None:
                 global_step = epoch * num_batches + batch_idx
                 writer.add_scalar(
                     "train/batch_loss", loss.item() * accum_steps, global_step
+                )
+                writer.add_scalar(
+                    "train/diff_loss", diff_loss.item(), global_step
+                )
+                writer.add_scalar(
+                    "train/recon_loss", recon_loss.item(), global_step
+                )
+                writer.add_scalar(
+                    "train/kl_loss", kl_loss.item(), global_step
                 )
 
     avg_loss = total_loss / num_batches
@@ -239,12 +253,15 @@ def validate(model, dataloader, device, epoch, args, writer=None, rank=0):
             class_labels = None
 
         with autocast(enabled=args.use_amp):
-            loss = model(videos, class_labels)
+            loss, diff_loss, recon_loss, kl_loss = model(videos, class_labels)
 
         total_loss += loss.item()
 
         if rank == 0:
-            pbar.set_postfix({"val_loss": loss.item()})
+            pbar.set_postfix({
+                "val_loss": loss.item(),
+                "val_recon": recon_loss.item()
+            })
 
     avg_loss = total_loss / num_batches
 
@@ -295,6 +312,8 @@ def train_single_gpu(args):
         prediction_type=args.prediction_type,
         guidance_scale=args.guidance_scale,
         p_uncond=args.p_uncond,
+        vae_loss_weight=args.vae_loss_weight,
+        kl_loss_weight=args.kl_loss_weight,
     )
 
     model = model.to(device)
@@ -559,6 +578,12 @@ def main():
         type=float,
         default=0.1,
         help="Probability of unconditional training",
+    )
+    parser.add_argument(
+        "--vae_loss_weight", type=float, default=1.0, help="Weight for VAE reconstruction loss"
+    )
+    parser.add_argument(
+        "--kl_loss_weight", type=float, default=1e-6, help="Weight for VAE KL divergence loss"
     )
 
     # Training parameters
