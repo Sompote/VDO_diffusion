@@ -273,6 +273,7 @@ def validate(model, dataloader, device, epoch, args, writer=None, rank=0):
 
 def train_single_gpu(args):
     """Training on single GPU"""
+    rank = 0  # Single GPU always has rank 0
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Training on device: {device}")
 
