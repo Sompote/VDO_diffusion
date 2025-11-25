@@ -358,8 +358,17 @@ def train_single_gpu(args):
         frame_interval=args.frame_interval,
         mode="train",
         num_workers=args.num_workers,
+        mode="train",
+        num_workers=args.num_workers,
         augment=False,  # Disabled per user request for single-clip overfitting
     )
+    
+    # DEBUG: Print found samples
+    if rank == 0:
+        print(f"DEBUG: Train dataset samples: {len(train_loader.dataset)}")
+        for i, s in enumerate(train_loader.dataset.samples):
+            print(f"  Sample {i}: {s['path']}")
+            if i >= 5: break # Only print first 5
 
     val_loader = None
     if args.val_dir:
