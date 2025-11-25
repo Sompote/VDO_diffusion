@@ -35,6 +35,7 @@ class VideoDataset(Dataset):
             ".tiff",
         ),
         augment: bool = True,
+        debug_mode: bool = False,
     ):
         """
         Args:
@@ -52,7 +53,8 @@ class VideoDataset(Dataset):
         self.frame_interval = frame_interval
         self.mode = mode
         self.image_extensions = image_extensions
-        self.augment = augment and mode == "train"
+        self.debug_mode = debug_mode
+        self.augment = augment and mode == "train" and not debug_mode  # No augment in debug mode
 
         # Collect video files
         samples = []
@@ -65,6 +67,9 @@ class VideoDataset(Dataset):
         for ext in image_extensions:
             for img_path in self.video_dir.rglob(f"*{ext}"):
                 parent = img_path.parent
+                # Skip hidden directories and .ipynb_checkpoints
+                if any(part.startswith('.') for part in parent.parts):
+                    continue
                 image_groups.setdefault(parent, []).append(img_path)
 
         for parent, files in image_groups.items():
@@ -126,7 +131,8 @@ class VideoDataset(Dataset):
                 return None
 
             # Random start position for training, fixed for validation
-            if self.mode == "train":
+            # In debug mode, always use fixed position
+            if self.mode == "train" and not self.debug_mode:
                 start_frame = random.randint(0, total_frames - required_frames)
             else:
                 start_frame = (total_frames - required_frames) // 2
@@ -211,7 +217,8 @@ class VideoDataset(Dataset):
             )
             return None
 
-        if self.mode == "train":
+        # In debug mode, always use fixed position
+        if self.mode == "train" and not self.debug_mode:
             start_index = random.randint(0, max_offset)
         else:
             start_index = max_offset // 2 if max_offset > 0 else 0
@@ -336,6 +343,7 @@ def create_video_dataloader(
     num_workers: int = 4,
     pin_memory: bool = True,
     augment: bool = True,
+    debug_mode: bool = False,
 ) -> DataLoader:
     """
     Create a DataLoader for video dataset
@@ -361,12 +369,13 @@ def create_video_dataloader(
         frame_interval=frame_interval,
         mode=mode,
         augment=augment,
+        debug_mode=debug_mode,
     )
 
     dataloader = DataLoader(
         dataset,
         batch_size=batch_size,
-        shuffle=(mode == "train"),
+        shuffle=(mode == "train" and not debug_mode),  # No shuffle in debug mode
         num_workers=num_workers,
         pin_memory=pin_memory,
         drop_last=True,

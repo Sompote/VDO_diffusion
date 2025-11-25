@@ -145,10 +145,19 @@ def train_epoch(
     model, dataloader, optimizer, scaler, ema, device, epoch, args, writer=None, rank=0
 ):
     """Train for one epoch with mixed precision"""
-    model.train()
+    if args.debug_mode:
+        model.eval()  # Debug mode: use eval to disable dropout
+        # Set fixed seed for reproducibility
+        torch.manual_seed(args.debug_seed)
+        torch.cuda.manual_seed_all(args.debug_seed)
+        if rank == 0:
+            print(f"[DEBUG MODE] Using model.eval() and seed={args.debug_seed} for training")
+    else:
+        model.train()
+
     total_loss = 0.0
     num_batches = len(dataloader)
-    accum_steps = args.gradient_accumulation_steps
+    accum_steps = args.gradient_accumulation_steps if not args.debug_mode else 1  # Debug mode: no loss scaling
 
     if rank == 0:
         pbar = tqdm(dataloader, desc=f"Epoch {epoch}")
@@ -164,9 +173,13 @@ def train_epoch(
         with autocast(enabled=args.use_amp):
             # Random class labels for classifier-free guidance
             if args.num_classes:
-                class_labels = torch.randint(
-                    0, args.num_classes, (videos.shape[0],), device=device
-                )
+                if args.debug_mode:
+                    # Debug mode: use fixed labels (all zeros) for reproducibility
+                    class_labels = torch.zeros(videos.shape[0], dtype=torch.long, device=device)
+                else:
+                    class_labels = torch.randint(
+                        0, args.num_classes, (videos.shape[0],), device=device
+                    )
             else:
                 class_labels = None
 
@@ -234,6 +247,15 @@ def train_epoch(
 def validate(model, dataloader, device, epoch, args, writer=None, rank=0):
     """Validate the model"""
     model.eval()
+
+    # Use deterministic validation for reproducible results
+    if args.deterministic or args.debug_mode:
+        val_seed = args.debug_seed if args.debug_mode else args.val_seed
+        torch.manual_seed(val_seed)
+        torch.cuda.manual_seed_all(val_seed)
+        if rank == 0 and epoch == 0:
+            print(f"[DETERMINISTIC] Validation using fixed seed={val_seed} for reproducibility")
+
     total_loss = 0.0
     num_batches = len(dataloader)
 
@@ -246,9 +268,13 @@ def validate(model, dataloader, device, epoch, args, writer=None, rank=0):
         videos = videos.to(device)
 
         if args.num_classes:
-            class_labels = torch.randint(
-                0, args.num_classes, (videos.shape[0],), device=device
-            )
+            if args.debug_mode:
+                # Debug mode: use fixed labels (all zeros) for reproducibility
+                class_labels = torch.zeros(videos.shape[0], dtype=torch.long, device=device)
+            else:
+                class_labels = torch.randint(
+                    0, args.num_classes, (videos.shape[0],), device=device
+                )
         else:
             class_labels = None
 
@@ -348,7 +374,11 @@ def train_single_gpu(args):
     scaler = GradScaler(enabled=args.use_amp)
 
     # EMA
-    ema = EMA(model, decay=args.ema_decay, device=device) if args.use_ema else None
+    if args.debug_mode and args.use_ema:
+        print("[DEBUG MODE] Disabling EMA to ensure reproducible losses")
+        ema = None
+    else:
+        ema = EMA(model, decay=args.ema_decay, device=device) if args.use_ema else None
 
     # Create dataloaders
     train_loader = create_video_dataloader(
@@ -359,8 +389,8 @@ def train_single_gpu(args):
         frame_interval=args.frame_interval,
         mode="train",
         num_workers=args.num_workers,
-
         augment=False,  # Disabled per user request for single-clip overfitting
+        debug_mode=args.debug_mode,
     )
     
     # DEBUG: Print found samples
@@ -381,6 +411,7 @@ def train_single_gpu(args):
             mode="val",
             num_workers=args.num_workers,
             augment=False,
+            debug_mode=args.debug_mode,
         )
 
     # Tensorboard
@@ -401,6 +432,35 @@ def train_single_gpu(args):
 
     # Training loop
     best_val_loss = float("inf")
+
+    if args.debug_mode:
+        print("\n" + "="*70)
+        print("⚠️  WARNING: DEBUG MODE ENABLED ⚠️")
+        print("="*70)
+        print("DEBUG MODE IS FOR TESTING ONLY - NOT FOR REAL TRAINING!")
+        print("This mode uses model.eval() which prevents proper training.")
+        print("For real training, use --deterministic instead (without --debug_mode)")
+        print("\nDebug mode features:")
+        print("  • Model in eval() mode (dropout disabled)")
+        print("  • Fixed class labels (all zeros)")
+        print("  • EMA disabled")
+        print("  • No gradient accumulation loss scaling")
+        print(f"  • Fixed random seed ({args.debug_seed})")
+        print("  • No data shuffling")
+        print("  • No data augmentation")
+        print("="*70 + "\n")
+    elif args.deterministic:
+        print("\n" + "="*70)
+        print("DETERMINISTIC VALIDATION ENABLED")
+        print("="*70)
+        print("Training: Normal mode with proper gradient updates")
+        print(f"Validation: Deterministic with fixed seed={args.val_seed}")
+        print("Benefits:")
+        print("  ✓ Proper training with model.train()")
+        print("  ✓ EMA enabled for better results")
+        print("  ✓ Reproducible validation metrics")
+        print("  ✓ No validation data shuffling")
+        print("="*70 + "\n")
 
     for epoch in range(start_epoch, args.epochs):
         print(f"\n{'=' * 50}")
@@ -642,6 +702,24 @@ def main():
         "--resume", type=str, default=None, help="Resume from checkpoint"
     )
     parser.add_argument("--gpus", type=int, default=1, help="Number of GPUs to use")
+
+    # Debug mode (ONLY for testing - DO NOT use for real training!)
+    parser.add_argument(
+        "--debug_mode", action="store_true",
+        help="[TESTING ONLY] Enable debug mode: use eval mode for both train/val, fixed class labels, no EMA, no loss scaling, fixed random seed. This ensures identical losses when using same data. DO NOT USE FOR REAL TRAINING!"
+    )
+    parser.add_argument(
+        "--debug_seed", type=int, default=42,
+        help="Random seed for debug mode (default: 42)"
+    )
+    parser.add_argument(
+        "--deterministic", action="store_true", default=True,
+        help="Use deterministic validation (fixed seed, no shuffle) for reproducible results. Recommended for tracking progress. (default: True)"
+    )
+    parser.add_argument(
+        "--val_seed", type=int, default=12345,
+        help="Random seed for deterministic validation (default: 12345)"
+    )
 
     args = parser.parse_args()
 
