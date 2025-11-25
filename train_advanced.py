@@ -358,7 +358,7 @@ def train_single_gpu(args):
         frame_interval=args.frame_interval,
         mode="train",
         num_workers=args.num_workers,
-        augment=True,
+        augment=False,  # Disabled per user request for single-clip overfitting
     )
 
     val_loader = None
