@@ -13,6 +13,10 @@ This script implements a state-of-the-art **Latent Diffusion Transformer (DiT)**
 | **Speed** | Slower | **Faster** (due to compression) |
 | **Quality** | Good for simple motion | **State-of-the-Art** (High fidelity) |
 
+## 🏗️ Model Architecture
+
+![Model Architecture](assets/video_diffusion_architecture.png)
+
 ## 📁 Data Folder Structure
 
 `train_advanced.py` expects a simple folder structure. You do **not** need a `dataset.yaml`.
