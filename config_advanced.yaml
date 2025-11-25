@@ -3,9 +3,9 @@
 
 # Data Configuration
 data:
-  train_dir: "/workspace/data/testvdo"
-  val_dir: "/workspace/data/testvdo"
-  output_dir: "./runs/advanced_experiment_trial"
+  train_dir: "/workspace/data/train_videos"
+  val_dir: "/workspace/data/val_videos"
+  output_dir: "./runs/advanced_experiment"
 
 # Video Settings
 video:
@@ -40,12 +40,12 @@ diffusion:
   guidance_scale: 1.0         # Reduced to 1.0 for unconditional/small dataset
   p_uncond: 0.1               # Probability of unconditional training
   vae_loss_weight: 5.0        # Increased to prioritize reconstruction
-  kl_loss_weight: 0.00001     # Decreased - KL loss was too high, causing blur
+  kl_loss_weight: 0.00001     # Reduced to prevent over-regularization and checkerboard artifacts
 
 # Training Hyperparameters
 training:
   batch_size: 1              # Batch size per GPU
-  epochs: 400
+  epochs: 800
   lr: 0.0001                  # 1e-4
   lr_schedule: "cosine"
   weight_decay: 0.01

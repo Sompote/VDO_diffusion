@@ -391,25 +391,20 @@ class VideoVAE3D(nn.Module):
             if i > 0:
                 if reversed_temporal[i - 1]:
                     # Spatial and temporal upsampling
+                    # Use Upsample + Conv instead of ConvTranspose to avoid checkerboard artifacts
                     self.decoder.append(
-                        nn.ConvTranspose3d(
-                            in_ch,
-                            in_ch,
-                            kernel_size=(3, 4, 4),
-                            stride=(2, 2, 2),
-                            padding=(1, 1, 1),
-                            output_padding=(1, 0, 0),
+                        nn.Sequential(
+                            nn.Upsample(scale_factor=(2, 2, 2), mode='trilinear', align_corners=False),
+                            nn.Conv3d(in_ch, in_ch, kernel_size=3, padding=1)
                         )
                     )
                 else:
                     # Spatial only upsampling
+                    # Use Upsample + Conv instead of ConvTranspose to avoid checkerboard artifacts
                     self.decoder.append(
-                        nn.ConvTranspose3d(
-                            in_ch,
-                            in_ch,
-                            kernel_size=(1, 4, 4),
-                            stride=(1, 2, 2),
-                            padding=(0, 1, 1),
+                        nn.Sequential(
+                            nn.Upsample(scale_factor=(1, 2, 2), mode='trilinear', align_corners=False),
+                            nn.Conv3d(in_ch, in_ch, kernel_size=3, padding=1)
                         )
                     )
 
