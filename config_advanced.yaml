@@ -45,7 +45,7 @@ diffusion:
 # Training Hyperparameters
 training:
   batch_size: 1              # Batch size per GPU
-  epochs: 800
+  epochs: 600
   lr: 0.0001                  # 1e-4
   lr_schedule: "cosine"
   weight_decay: 0.01

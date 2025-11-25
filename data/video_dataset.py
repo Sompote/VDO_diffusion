@@ -36,6 +36,8 @@ class VideoDataset(Dataset):
         ),
         augment: bool = True,
         debug_mode: bool = False,
+        use_sliding_window: bool = True,
+        window_stride: int = 1,
     ):
         """
         Args:
@@ -46,6 +48,8 @@ class VideoDataset(Dataset):
             mode: 'train' or 'val'
             video_extensions: Tuple of valid video file extensions
             augment: Whether to apply data augmentation
+            use_sliding_window: If True, create multiple clips per sequence using sliding window
+            window_stride: Stride for sliding window (1 = maximum overlap, higher = less overlap)
         """
         self.video_dir = Path(video_dir)
         self.num_frames = num_frames
@@ -55,12 +59,14 @@ class VideoDataset(Dataset):
         self.image_extensions = image_extensions
         self.debug_mode = debug_mode
         self.augment = augment and mode == "train" and not debug_mode  # No augment in debug mode
+        self.use_sliding_window = use_sliding_window
+        self.window_stride = window_stride
 
         # Collect video files
-        samples = []
+        raw_samples = []
         for ext in video_extensions:
             for path in self.video_dir.rglob(f"*{ext}"):
-                samples.append({"type": "video", "path": path})
+                raw_samples.append({"type": "video", "path": path})
 
         # Collect image sequences grouped by parent directory
         image_groups = {}
@@ -76,20 +82,29 @@ class VideoDataset(Dataset):
             files = sorted(files)
             if not files:
                 continue
-            samples.append({"type": "images", "path": parent, "frames": files})
+            raw_samples.append({"type": "images", "path": parent, "frames": files})
 
-        if len(samples) == 0:
+        if len(raw_samples) == 0:
             raise ValueError(
                 f"No video or image sequences found in {video_dir}."
             )
 
-        self.samples = samples
-
-        video_count = sum(1 for s in samples if s["type"] == "video")
-        image_count = sum(1 for s in samples if s["type"] == "images")
+        video_count = sum(1 for s in raw_samples if s["type"] == "video")
+        image_count = sum(1 for s in raw_samples if s["type"] == "images")
         print(
             f"Found {video_count} videos and {image_count} image sequences in {video_dir}"
         )
+
+        # Generate clips using sliding window if enabled
+        if self.use_sliding_window:
+            self.clips = self._generate_clips(raw_samples)
+            print(
+                f"Generated {len(self.clips)} clips using sliding window (stride={window_stride})"
+            )
+        else:
+            # Legacy mode: one random clip per sequence
+            self.clips = [{"source": s, "start_index": None} for s in raw_samples]
+            print(f"Using legacy mode: {len(self.clips)} sequences (random sampling per epoch)")
 
         # Define transforms
         self.transform = transforms.Compose(
@@ -101,8 +116,53 @@ class VideoDataset(Dataset):
             ]
         )
 
+    def _generate_clips(self, raw_samples: List[dict]) -> List[dict]:
+        """
+        Generate all possible clips from sequences using sliding window.
+
+        Args:
+            raw_samples: List of raw video/image sequence samples
+
+        Returns:
+            List of clip dictionaries with source and start_index
+        """
+        clips = []
+
+        for sample in raw_samples:
+            if sample["type"] == "video":
+                # For videos, we need to know total frame count
+                # We'll compute this when loading
+                clips.append({
+                    "source": sample,
+                    "start_index": None,  # Will be computed at load time for videos
+                    "is_video": True
+                })
+            else:
+                # For image sequences, pre-compute all valid starting positions
+                frames = sorted(sample["frames"])
+                total_frames = len(frames)
+
+                # Calculate how many frames we need
+                required_frames = (self.num_frames - 1) * self.frame_interval + 1
+
+                if total_frames < required_frames:
+                    print(f"Skipping {sample['path']}: only {total_frames} frames, need {required_frames}")
+                    continue
+
+                # Generate all valid starting positions
+                max_start = total_frames - required_frames
+
+                for start_idx in range(0, max_start + 1, self.window_stride):
+                    clips.append({
+                        "source": sample,
+                        "start_index": start_idx,
+                        "is_video": False
+                    })
+
+        return clips
+
     def __len__(self) -> int:
-        return len(self.samples)
+        return len(self.clips)
 
     def load_video(self, video_path: Path) -> Optional[torch.Tensor]:
         """
@@ -201,8 +261,14 @@ class VideoDataset(Dataset):
 
         return video
 
-    def load_image_sequence(self, image_paths) -> Optional[torch.Tensor]:
-        """Load a sequence of images located in the same directory."""
+    def load_image_sequence(self, image_paths, start_index: Optional[int] = None) -> Optional[torch.Tensor]:
+        """
+        Load a sequence of images located in the same directory.
+
+        Args:
+            image_paths: List of image file paths
+            start_index: Starting frame index. If None, will be randomly chosen (legacy mode)
+        """
 
         frames = sorted(image_paths)
         total_frames = len(frames)
@@ -217,11 +283,13 @@ class VideoDataset(Dataset):
             )
             return None
 
-        # In debug mode, always use fixed position
-        if self.mode == "train" and not self.debug_mode:
-            start_index = random.randint(0, max_offset)
-        else:
-            start_index = max_offset // 2 if max_offset > 0 else 0
+        # Use provided start_index or compute it (legacy mode)
+        if start_index is None:
+            # Legacy random/fixed selection
+            if self.mode == "train" and not self.debug_mode:
+                start_index = random.randint(0, max_offset)
+            else:
+                start_index = max_offset // 2 if max_offset > 0 else 0
 
         selected_indices = [
             start_index + i * self.frame_interval for i in range(self.num_frames)
@@ -243,28 +311,33 @@ class VideoDataset(Dataset):
 
     def __getitem__(self, idx: int) -> torch.Tensor:
         """
-        Get a video sample
+        Get a video clip sample
 
         Returns:
             Video tensor of shape (C, T, H, W)
         """
-        sample = self.samples[idx]
+        clip = self.clips[idx]
+        source = clip["source"]
+        start_index = clip["start_index"]
 
-        # Try to load video, if fails, try another random sample
+        # Try to load video, if fails, try another random clip
         max_attempts = 10
         for attempt in range(max_attempts):
-            if sample["type"] == "video":
-                video = self.load_video(sample["path"])
+            if source["type"] == "video":
+                video = self.load_video(source["path"])
             else:
-                video = self.load_image_sequence(sample["frames"])
+                video = self.load_image_sequence(source["frames"], start_index=start_index)
 
             if video is not None:
                 if self.augment:
                     video = self.augment_video(video)
                 return video
 
-            # If loading fails, try a random different sample
-            sample = random.choice(self.samples)
+            # If loading fails, try a random different clip
+            idx = random.randint(0, len(self.clips) - 1)
+            clip = self.clips[idx]
+            source = clip["source"]
+            start_index = clip["start_index"]
 
         # If all attempts fail, return a tensor of zeros
         print(f"Failed to load video after {max_attempts} attempts, returning zeros")
@@ -344,6 +417,8 @@ def create_video_dataloader(
     pin_memory: bool = True,
     augment: bool = True,
     debug_mode: bool = False,
+    use_sliding_window: bool = True,
+    window_stride: int = 1,
 ) -> DataLoader:
     """
     Create a DataLoader for video dataset
@@ -358,6 +433,8 @@ def create_video_dataloader(
         num_workers: Number of worker processes
         pin_memory: Whether to pin memory
         augment: Whether to apply augmentation
+        use_sliding_window: If True, create multiple clips per sequence using sliding window
+        window_stride: Stride for sliding window (1 = maximum overlap, higher = less overlap)
 
     Returns:
         DataLoader instance
@@ -370,6 +447,8 @@ def create_video_dataloader(
         mode=mode,
         augment=augment,
         debug_mode=debug_mode,
+        use_sliding_window=use_sliding_window,
+        window_stride=window_stride,
     )
 
     dataloader = DataLoader(
