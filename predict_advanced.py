@@ -310,6 +310,12 @@ def predict(model, args, device):
     decoded_video = model.vae.decode(z)
     
     print(f"Decoded shape: {decoded_video.shape}")
+
+    # Replace reconstructed context with original frames for perfect fidelity
+    # Ensure shapes match (handle potential VAE padding/cropping if any, though usually they match)
+    if decoded_video.shape[2] >= context_frames.shape[2]:
+        print("Restoring original context frames...")
+        decoded_video[:, :, :context_frames.shape[2], :, :] = context_frames
     
     # Save
     output_path = Path(args.output_dir) / f"{args.output_name}.mp4"

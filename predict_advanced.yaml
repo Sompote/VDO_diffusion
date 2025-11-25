@@ -3,8 +3,8 @@
 
 # Inference Settings
 inference:
-  checkpoint: "./runs/advanced_experiment/checkpoint_latest.pth"
-  input_video: "./data/val_videos/clip_100.mp4" # Can be a video file OR a directory of images
+  checkpoint: "/workspace/VDO_diffusion/runs/advanced_experiment/best_model.pth"
+  input_video: "/workspace/data/train_videos/drive_0013" # Can be a video file OR a directory of images
   output_dir: "./outputs/advanced_predictions"
   output_name: "prediction_result"
   device: "cuda"  # or "cpu"
