@@ -517,13 +517,13 @@ def main():
         "--spatial_downsample", type=int, default=8, help="Spatial downsample factor"
     )
     parser.add_argument(
-        "--temporal_downsample", type=int, default=4, help="Temporal downsample factor"
+        "--temporal_downsample", type=int, default=1, help="Temporal downsample factor"
     )
     parser.add_argument(
         "--vae_temporal_downsample",
         type=int,
         nargs="+",
-        default=[0, 1, 1, 0],
+        default=[0, 0, 0, 0],
         help="VAE temporal downsample layers (0=False, 1=True)",
     )
 
