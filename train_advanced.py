@@ -345,13 +345,20 @@ def train_single_gpu(args):
 
     model = model.to(device)
 
-    # Count parameters
-    num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"Model parameters: {num_params:,} ({num_params / 1e6:.2f}M)")
+    # IMPORTANT: Freeze VAE to prevent moving target during diffusion training
+    print("Freezing VAE parameters...")
+    for param in model.vae.parameters():
+        param.requires_grad = False
 
-    # Create optimizer
+    # Count parameters
+    num_params_total = sum(p.numel() for p in model.parameters())
+    num_params_trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"Total parameters: {num_params_total:,} ({num_params_total / 1e6:.2f}M)")
+    print(f"Trainable parameters (DiT only): {num_params_trainable:,} ({num_params_trainable / 1e6:.2f}M)")
+
+    # Create optimizer - only optimize DiT parameters
     optimizer = torch.optim.AdamW(
-        model.parameters(),
+        [p for p in model.parameters() if p.requires_grad],
         lr=args.lr,
         betas=(args.adam_beta1, args.adam_beta2),
         weight_decay=args.weight_decay,
