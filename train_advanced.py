@@ -393,11 +393,13 @@ def train_single_gpu(args):
         debug_mode=args.debug_mode,
     )
     
-    # DEBUG: Print found samples
+    # DEBUG: Print found clips
     if rank == 0:
-        print(f"DEBUG: Train dataset samples: {len(train_loader.dataset)}")
-        for i, s in enumerate(train_loader.dataset.samples):
-            print(f"  Sample {i}: {s['path']}")
+        print(f"DEBUG: Train dataset clips: {len(train_loader.dataset)}")
+        for i, clip in enumerate(train_loader.dataset.clips):
+            source = clip['source']
+            start_idx = clip.get('start_index', 'random')
+            print(f"  Clip {i}: {source['path']} (start={start_idx})")
             if i >= 5: break # Only print first 5
 
     val_loader = None
