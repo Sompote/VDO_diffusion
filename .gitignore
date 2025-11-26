@@ -8,3 +8,4 @@ tmp_demo/
 tmp_runs/
 .claude/
 .ipynb_checkpoints/
+*.pth
