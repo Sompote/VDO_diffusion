@@ -341,6 +341,7 @@ def train_single_gpu(args):
         p_uncond=args.p_uncond,
         vae_loss_weight=args.vae_loss_weight,
         kl_loss_weight=args.kl_loss_weight,
+        vae_scale_factor=args.vae_scale_factor,
     )
 
     model = model.to(device)
@@ -675,6 +676,9 @@ def main():
     )
     parser.add_argument(
         "--kl_loss_weight", type=float, default=1e-6, help="Weight for VAE KL divergence loss"
+    )
+    parser.add_argument(
+        "--vae_scale_factor", type=float, default=1.0, help="Scale factor for latents (e.g., 0.18215 for SD)"
     )
 
     # Training parameters

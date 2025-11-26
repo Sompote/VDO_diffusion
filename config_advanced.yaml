@@ -21,6 +21,7 @@ vae:
   vae_temporal_downsample: [0, 0, 0, 0] # No temporal downsampling
   spatial_downsample: 8       # 256 -> 32
   temporal_downsample: 1      # 6 -> 6 (1 Real Frame = 1 Latent Frame)
+  vae_scale_factor: 0.4411    # Normalize latents to ~1.0 std (Calculated from diagnose_latents.py)
 
 # DiT (Diffusion Transformer) Architecture
 dit:

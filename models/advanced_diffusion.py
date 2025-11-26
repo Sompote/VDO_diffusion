@@ -665,6 +665,7 @@ class AdvancedVideoDiffusion(nn.Module):
         p_uncond: float = 0.1,  # Probability of unconditional training
         vae_loss_weight: float = 1.0,
         kl_loss_weight: float = 1e-6,
+        vae_scale_factor: float = 1.0,
     ):
         super().__init__()
 
@@ -676,6 +677,7 @@ class AdvancedVideoDiffusion(nn.Module):
         self.p_uncond = p_uncond
         self.vae_loss_weight = vae_loss_weight
         self.kl_loss_weight = kl_loss_weight
+        self.vae_scale_factor = vae_scale_factor
 
         # Create noise schedule
         if beta_schedule == "linear":
@@ -729,12 +731,12 @@ class AdvancedVideoDiffusion(nn.Module):
     def encode_to_latent(self, x: torch.Tensor) -> torch.Tensor:
         """Encode video to latent space"""
         z, _, _ = self.vae.encode(x)
-        return z
+        return z * self.vae_scale_factor
 
     @torch.no_grad()
     def decode_from_latent(self, z: torch.Tensor) -> torch.Tensor:
         """Decode latent to video"""
-        return self.vae.decode(z)
+        return self.vae.decode(z / self.vae_scale_factor)
 
     def q_sample(
         self,
@@ -824,14 +826,17 @@ class AdvancedVideoDiffusion(nn.Module):
         kl_loss = -0.5 * torch.sum(1 + logvar - mean.pow(2) - logvar.exp())
         kl_loss = kl_loss / (B * x.shape[1] * x.shape[2] * x.shape[3] * x.shape[4]) # Normalize
 
+        # Scale latents for diffusion process
+        z_scaled = z * self.vae_scale_factor
+
         # Sample timesteps
         t = torch.randint(0, self.num_timesteps, (B,), device=device).long()
 
         # Sample noise
-        noise = torch.randn_like(z)
+        noise = torch.randn_like(z_scaled)
 
         # Forward diffusion
-        z_t = self.q_sample(z, t, noise)
+        z_t = self.q_sample(z_scaled, t, noise)
 
         # Classifier-free guidance: randomly drop conditioning
         if class_labels is not None and self.p_uncond > 0:
@@ -846,9 +851,9 @@ class AdvancedVideoDiffusion(nn.Module):
         if self.prediction_type == "eps":
             target = noise
         elif self.prediction_type == "x0":
-            target = z
+            target = z_scaled
         elif self.prediction_type == "v":
-            target = self.compute_v_target(z, noise, t)
+            target = self.compute_v_target(z_scaled, noise, t)
         else:
             raise ValueError(f"Unknown prediction type: {self.prediction_type}")
 

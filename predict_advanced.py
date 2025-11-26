@@ -161,6 +161,7 @@ def load_model(args, device):
         prediction_type=args.prediction_type,
         guidance_scale=args.guidance_scale,
         p_uncond=args.p_uncond,
+        vae_scale_factor=getattr(args, 'vae_scale_factor', 1.0),
     )
 
     # Load checkpoint
