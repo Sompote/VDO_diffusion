@@ -1,19 +1,28 @@
 # Video Diffusion Prediction Framework
 
-A PyTorch implementation of a diffusion model for video prediction. This framework uses a 3D U-Net architecture with temporal attention to predict future video frames given context frames.
+A PyTorch implementation of a diffusion model for video prediction. This framework offers two distinct architectures for different needs.
 
 **Developed by AI Research Group, Department of Civil Engineering, King Mongkut's University of Technology Thonburi (KMUTT)**
 
 ## Features
 
 - **Dual Architecture Support**:
-  - **Basic**: 3D U-Net for pixel-space diffusion
-  - **Advanced**: Latent Diffusion Transformer (DiT) with 3D VAE for high-resolution video
-- **Flexible Input**: Supports video files (`.mp4`, `.avi`) and image sequences (folders of frames)
-- **Configuration**: YAML-based configuration for both training and inference
-- **Multi-GPU Training**: Distributed Data Parallel (DDP) support
-- **Video Prediction**: Generate future frames from context frames
-- **Unconditional Generation**: Generate videos from pure noise
+  - **Advanced**: Latent Diffusion Transformer (DiT) with 3D VAE for high-resolution, state-of-the-art video generation.
+  - **Basic**: 3D U-Net for pixel-space diffusion, suitable for learning and simple datasets.
+- **Flexible Input**: Supports video files (`.mp4`, `.avi`) and image sequences.
+- **Configuration**: YAML-based configuration.
+- **Multi-GPU Training**: Distributed Data Parallel (DDP) support.
+
+## ⚡ Architecture Comparison
+
+| Feature | Basic (`train.py`) | Advanced (`train_advanced.py`) |
+| :--- | :--- | :--- |
+| **Architecture** | **3D U-Net** (Standard CNN) | **DiT** (Diffusion Transformer) |
+| **Input Data** | Raw Pixels | **Latents** (Compressed via 3D VAE) |
+| **Configuration** | `config.yaml` & `dataset.yaml` | **YAML Config** or CLI Flags |
+| **Memory** | High (Stores full video) | **Efficient** (Stores compressed latents) |
+| **Speed** | Slower | **Faster** (due to compression) |
+| **Quality** | Good for simple motion | **State-of-the-Art** (High fidelity) |
 
 ## Installation
 
@@ -42,76 +51,162 @@ video_diffusion_prediction/
 └── README.md                 # This file
 ```
 
-## 🚀 Advanced Model Usage (Recommended)
+---
 
-The advanced model uses a **Latent Diffusion Transformer (DiT)** architecture, similar to Sora or Stable Video Diffusion. It offers higher quality and efficiency.
+## 🚀 Advanced Model (Latent DiT) - Recommended
 
-### 1. Training
+The advanced model implements a **Latent Diffusion Transformer (DiT)** architecture, similar to Sora or Stable Video Diffusion. It is designed for high-performance training on larger datasets.
+
+### Model Architecture
+![Advanced Architecture](assets/Gemini_Generated_Image_d3tzqd3tzqd3tzqd.png)
+
+### Data Folder Structure
+
+`train_advanced.py` expects a simple folder structure. You do **not** need a `dataset.yaml`.
+
+**Option 1: Video Files (Easiest)**
+Put all your video clips (`.mp4`, `.avi`, etc.) directly inside the train/val folders.
+```text
+data/
+├── train_videos/
+│   ├── clip_001.mp4
+│   ├── clip_002.mp4
+│   └── ...
+└── val_videos/
+    ├── clip_100.mp4
+    └── ...
+```
+
+**Option 2: Image Sequences (Best for raw frames)**
+Put each video clip in its own sub-folder containing the frames (`.jpg`, `.png`).
+```text
+data/
+├── train_videos/
+│   ├── drive_001/
+│   │   ├── frame_0001.jpg
+│   │   ├── frame_0002.jpg
+│   │   └── ...
+│   └── drive_002/
+│       ├── frame_0001.jpg
+│       └── ...
+└── val_videos/
+    └── ...
+```
+
+### How to Run
+
+You can run the script using a YAML configuration file (Recommended) or by passing arguments directly.
+
+**1. Using Config File (Recommended)**
 Edit `config_advanced.yaml` to set your parameters, then run:
-
 ```bash
 python train_advanced.py --config config_advanced.yaml
 ```
 
-**Data Structure:**
-You can use video files OR folders of images.
-```text
-data/train_videos/
-├── clip_001.mp4
-└── clip_002_folder/
-    ├── frame_001.jpg
-    ├── frame_002.jpg
-    └── ...
+**2. Overriding via CLI**
+You can override specific settings from the config file by passing them as arguments:
+```bash
+python train_advanced.py --config config_advanced.yaml --batch_size 2 --lr 5e-5
 ```
 
-### 2. Prediction
-Edit `predict_advanced.yaml` to point to your checkpoint and input video/folder.
+**3. Full Pipeline (Automated)**
+To run the complete two-stage training process (Pre-train VAE -> Train DiT), use the provided shell script:
+```bash
+./train_full_pipeline.sh
+```
+This script handles:
+1.  **Stage 1:** Pre-trains the 3D VAE (100 epochs) to learn efficient video compression.
+2.  **Stage 2:** Trains the DiT model (600 epochs) using the pre-trained VAE.
 
+### Key Parameters (Advanced)
+
+**Data Settings**
+*   `--train_dir`: Path to training videos folder.
+*   `--val_dir`: Path to validation videos folder (optional).
+*   `--num_frames`: Total frames per clip (default: 16).
+*   `--frame_size`: Resolution as `Height Width` (default: 256 256).
+
+**Model Architecture (DiT)**
+*   `--patch_size`: Size of patches to tokenize (default: 2 2).
+*   `--hidden_dim`: Width of the transformer (default: 768).
+*   `--depth`: Number of transformer blocks (default: 12).
+*   `--num_heads`: Attention heads (default: 12).
+
+**VAE (Compression)**
+*   `--latent_channels`: Channels in compressed latent space (default: 4).
+*   `--spatial_downsample`: How much to shrink image size (default: 8x).
+*   `--temporal_downsample`: How much to shrink frame count (default: 4x).
+
+**Training Optimizations**
+*   `--use_amp`: **Highly Recommended.** Uses Automatic Mixed Precision (FP16) to save memory and speed up training.
+*   `--use_ema`: Maintains a "shadow" model with smoothed weights for better generation quality.
+*   `--gradient_accumulation_steps`: Simulates larger batch sizes.
+
+### Inference (Prediction)
+
+After training, you can generate new videos using `predict_advanced.py`.
+
+**1. Configure Prediction**
+Edit `predict_advanced.yaml` to match your training settings (especially `video` and `vae` sections) and point to your checkpoint.
+
+```yaml
+inference:
+  checkpoint: "./runs/advanced_experiment/final_model.pth"
+  input_video: "./data/val_videos/clip_100.mp4"
+  output_dir: "./outputs/advanced_predictions"
+
+video:
+  num_frames: 6               # Must match training
+  num_context_frames: 5       # How many frames to condition on
+  ...
+```
+
+**2. Run Prediction**
 ```bash
 python predict_advanced.py --config predict_advanced.yaml
 ```
 
 ---
 
-## 🎓 Basic Model Usage (U-Net)
+## 🎓 Basic Model (3D U-Net) - Research
 
 The basic model uses a **3D U-Net**. Good for learning and simple datasets.
 
-### 1. Training
-Edit `config.yaml` and `dataset.yaml` (if needed).
+### How to Run
 
+**1. Training**
+Edit `config.yaml` and `dataset.yaml` (if needed).
 ```bash
 python train.py --config config.yaml --data dataset.yaml
 ```
 
-### 2. Prediction
+**2. Prediction**
 Edit `predict.yaml` to set your checkpoint and input.
-
 ```bash
 python predict.py --config predict.yaml
 ```
 
-## Training Parameters
+### Basic Model Parameters
 
-### Data Parameters
+**Data Parameters**
 - `--config`: Path to training configuration YAML (optional)
 - `--data`: Path to dataset YAML describing train/val/test splits
 - `--train_dir`, `--val_dir`: Override dataset directories directly
 - `--output_dir`: Override experiment output directory
 
-### Model / Sequence Parameters
+**Model / Sequence Parameters**
 - `--num_frames`: Total frames per training clip (optional with context/future split)
 - `--context_frames`, `--future_frames`: Define input vs. prediction window
 - `--frame_size`: Frame size (`H W`) or single square value
 - `--frame_interval`: Sampling interval between frames
 - `--base_channels`, `--channel_mults`, `--time_emb_dim`: Network width/depth controls
 
-### Diffusion Parameters
+**Diffusion Parameters**
 - `--num_timesteps`: Number of diffusion steps
 - `--beta_start`, `--beta_end`: Beta schedule bounds
 - `--schedule`: Noise schedule (`linear` or `cosine`)
 
-### Training Parameters
+**Training Parameters**
 - `--batch_size`, `--epochs`, `--lr`, `--weight_decay`
 - `--num_workers`: Data loader worker count
 - `--save_interval`: Checkpoint frequency
@@ -120,84 +215,7 @@ python predict.py --config predict.yaml
 - `--val_augment` / `--no-val-augment`: Toggle validation augmentations
 - `--gpus`: Number of GPUs (DDP spawns when >1)
 
-## Inference Parameters
-
-### Common Parameters
-- `--checkpoint`: Path to model checkpoint (required)
-- `--config`: Training configuration file (optional, defaults to `config.json` beside checkpoint)
-- `--data`: Dataset YAML describing context/future frames (optional)
-- `--device`: Device to run on - 'cuda' or 'cpu' (defaults to configuration or cuda)
-- `--mode`: Inference mode - 'predict' or 'generate'
-- `--frame_size`: Frame size as `H W` (inherits from configuration when omitted)
-- `--frame_interval`: Frame sampling stride for reading videos (defaults to configuration or 1)
-- `--output_dir`: Output directory (defaults to configuration or `./outputs`)
-- Architecture overrides: `--base_channels`, `--channel_mults`, `--time_emb_dim`
-- Diffusion overrides: `--num_timesteps`, `--beta_start`, `--beta_end`, `--schedule`
-
-### Prediction Mode
-- `--input_video`: Input video path (required)
-- `--num_context_frames`: Override context frames (inherits from configuration otherwise)
-- `--num_future_frames`: Override prediction horizon (inherits from configuration otherwise)
-- `--output_name`: Output video name (default: prediction)
-
-### Generation Mode
-- `--num_frames`: Total frames to generate (defaults to configuration or 16)
-- `--batch_size`: Number of videos to generate (default: configuration or 1)
-
-## Architecture Overview
-
-This repository implements a state-of-the-art **Latent Diffusion Transformer (DiT)** with 3D VAE for high-quality video generation and prediction. The architecture features:
-
-- **3D VAE Encoder/Decoder**: 192× compression (3.1M → 16K values)
-- **Diffusion Transformer**: 12 DiT blocks with factorized spatial-temporal attention
-- **V-Prediction**: Superior training dynamics and color stability
-- **Classifier-Free Guidance**: Controllable quality vs. diversity
-- **Mixed Precision Training**: 2× faster with automatic mixed precision
-- **~400M parameters** (configurable 100M-3B)
-
-<p align="center">
-  <img src="model_architecture.svg" alt="Complete Video Diffusion Architecture" width="100%" />
-</p>
-
-### Model Architecture Details
-
-#### Advanced Model (Latent DiT) - **Recommended for Production**
-
-**Complete Pipeline:**
-1. **3D VAE Encoder**: Compresses video from (B, 3, 16, 256, 256) → (B, 4, 4, 32, 32)
-2. **Diffusion Process**: Adds noise (training) or denoises iteratively (inference)
-3. **Latent Video DiT**: 12 transformer blocks with factorized attention (15× faster than full 3D)
-4. **3D VAE Decoder**: Decompresses latent back to (B, 3, 16, 256, 256)
-
-**Key Features:**
-- **Factorized Attention**: O(N²+T²) instead of O((N×T)²) → 15× speedup
-- **V-Prediction Parameterization**: Better color coherence than noise prediction
-- **Classifier-Free Guidance**: Training with 10% unconditional samples for controllable generation
-- **EMA Weights**: Exponential moving average (0.9999) for stable inference
-
-**Performance:**
-- Training Speed: 15-30× faster than basic U-Net model
-- GPU Memory: ~12GB (batch size 4, mixed precision)
-- Training Time: ~3 days on V100 for 100 epochs
-
-#### Basic Model (3D U-Net) - **Educational/Research**
-
-**Architecture:**
-- **VideoDiffusionUNet**: Spatial-temporal 3D convolutions with attention
-  - Input: Noisy video tensor (B, C, T, H, W) and timestep (B,)
-  - Output: Predicted noise tensor (B, C, T, H, W)
-  - Components: Sinusoidal time embeddings, residual blocks, multi-head attention, U-Net skip connections
-
-**GaussianDiffusion:**
-- Forward Process: Gradually adds noise to videos
-- Reverse Process: Denoises videos step by step
-- Training: Predicts noise added at random timesteps
-- Sampling: Generates videos by iterative denoising
-
-**Use Cases:**
-- Learning diffusion model fundamentals
-- Research on pixel-space video diffusion
-- Smaller datasets or quick prototyping
+---
 
 ## Monitoring Training
 
@@ -232,21 +250,6 @@ This will display:
 - GPU: 24GB VRAM (NVIDIA RTX 3090/4090 or A100)
 - RAM: 32GB+
 - Storage: SSD for faster data loading
-
-## Memory Optimization
-
-For limited GPU memory, try:
-
-```bash
-# Smaller model
-python train.py --batch_size 2 --num_frames 8 --base_channels 32 --channel_mults 1 2 4
-
-# Lower resolution
-python train.py --batch_size 4 --frame_size 128 128
-
-# Fewer timesteps (faster but lower quality)
-python train.py --num_timesteps 500
-```
 
 ## Citation
 

@@ -15,7 +15,7 @@ This script implements a state-of-the-art **Latent Diffusion Transformer (DiT)**
 
 ## 🏗️ Model Architecture
 
-![Model Architecture](assets/video_diffusion_architecture.png)
+![Model Architecture](assets/Gemini_Generated_Image_d3tzqd3tzqd3tzqd.png)
 
 ## 📁 Data Folder Structure
 
