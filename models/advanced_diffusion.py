@@ -496,6 +496,10 @@ class LatentVideoDiT(nn.Module):
         )
         self.num_patches = num_frames * self.num_patches_per_frame
 
+        # Calculate patch grid dimensions
+        self.num_patch_rows = img_size // patch_size[0]
+        self.num_patch_cols = img_size // patch_size[1]
+
         # Patchify: convert to tokens
         self.to_patch_embedding = nn.Sequential(
             Rearrange(
@@ -508,12 +512,16 @@ class LatentVideoDiT(nn.Module):
             nn.LayerNorm(hidden_dim),
         )
 
-        # Positional embeddings
-        self.pos_embed_spatial = nn.Parameter(
-            torch.randn(1, 1, self.num_patches_per_frame, hidden_dim) * 0.02
+        # 2D Positional embeddings (separate row and column)
+        # This explicitly encodes spatial structure
+        self.pos_embed_row = nn.Parameter(
+            torch.randn(1, 1, self.num_patch_rows, 1, hidden_dim) * 0.02
+        )
+        self.pos_embed_col = nn.Parameter(
+            torch.randn(1, 1, 1, self.num_patch_cols, hidden_dim) * 0.02
         )
         self.pos_embed_temporal = nn.Parameter(
-            torch.randn(1, num_frames, 1, hidden_dim) * 0.02
+            torch.randn(1, num_frames, 1, 1, hidden_dim) * 0.02
         )
 
         # Time embedding
@@ -593,8 +601,16 @@ class LatentVideoDiT(nn.Module):
         # Convert to patches: (B, T, N, D)
         x = self.to_patch_embedding(x)
 
-        # Add positional embeddings
-        x = x + self.pos_embed_spatial + self.pos_embed_temporal
+        # Reshape to 2D grid for adding 2D positional embeddings
+        # (B, T, N, D) -> (B, T, H, W, D)
+        x = x.view(B, self.num_frames, self.num_patch_rows, self.num_patch_cols, self.hidden_dim)
+
+        # Add 2D positional embeddings
+        x = x + self.pos_embed_row + self.pos_embed_col + self.pos_embed_temporal
+
+        # Flatten back to sequence
+        # (B, T, H, W, D) -> (B, T, N, D)
+        x = x.view(B, self.num_frames, self.num_patches_per_frame, self.hidden_dim)
 
         # Time embedding
         t_emb = self.time_embed(timesteps)
