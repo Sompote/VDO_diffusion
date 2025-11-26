@@ -345,6 +345,18 @@ def train_single_gpu(args):
 
     model = model.to(device)
 
+    # Load pre-trained VAE if provided
+    if args.vae_checkpoint:
+        print(f"Loading pre-trained VAE from {args.vae_checkpoint}")
+        vae_checkpoint = torch.load(args.vae_checkpoint, map_location=device)
+        model.vae.load_state_dict(vae_checkpoint['vae_state_dict'])
+        print("✓ Pre-trained VAE loaded successfully")
+    else:
+        print("WARNING: No pre-trained VAE provided!")
+        print("The VAE will start from random initialization.")
+        print("For best results, pre-train the VAE first:")
+        print("  python train_vae_only.py --epochs 100")
+
     # IMPORTANT: Freeze VAE to prevent moving target during diffusion training
     print("Freezing VAE parameters...")
     for param in model.vae.parameters():
@@ -554,6 +566,7 @@ def main():
 
     # Config file
     parser.add_argument("--config", type=str, help="Path to YAML configuration file")
+    parser.add_argument("--vae_checkpoint", type=str, help="Path to pre-trained VAE checkpoint (for Stage 2)")
 
     # Data parameters
     parser.add_argument(
