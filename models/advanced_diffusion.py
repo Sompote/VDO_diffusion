@@ -602,15 +602,21 @@ class LatentVideoDiT(nn.Module):
         x = self.to_patch_embedding(x)
 
         # Reshape to 2D grid for adding 2D positional embeddings
+        # IMPORTANT: Use einops to ensure consistent ordering with patchify!
         # (B, T, N, D) -> (B, T, H, W, D)
-        x = x.view(B, self.num_frames, self.num_patch_rows, self.num_patch_cols, self.hidden_dim)
+        x = rearrange(
+            x,
+            "b t (h w) d -> b t h w d",
+            h=self.num_patch_rows,
+            w=self.num_patch_cols,
+        )
 
         # Add 2D positional embeddings
         x = x + self.pos_embed_row + self.pos_embed_col + self.pos_embed_temporal
 
         # Flatten back to sequence
         # (B, T, H, W, D) -> (B, T, N, D)
-        x = x.view(B, self.num_frames, self.num_patches_per_frame, self.hidden_dim)
+        x = rearrange(x, "b t h w d -> b t (h w) d")
 
         # Time embedding
         t_emb = self.time_embed(timesteps)
