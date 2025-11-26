@@ -93,30 +93,36 @@ data/
     └── ...
 ```
 
-### How to Run
+### How to Run (Recommended Workflow)
 
-You can run the script using a YAML configuration file (Recommended) or by passing arguments directly.
+For the best results, we recommend a **2-Stage Training Process**: first train the VAE to learn good video compression, then train the DiT on the compressed latents.
 
-**1. Using Config File (Recommended)**
-Edit `config_advanced.yaml` to set your parameters, then run:
+**Step 1: Train VAE (Compression)**
+Train the 3D VAE to reconstruct videos accurately.
 ```bash
-python train_advanced.py --config config_advanced.yaml
+python train_vae_only.py --train_dir ./data/train_videos --epochs 100
+```
+*Output: `runs/vae_train/final_vae.pth`*
+
+**Step 2: Train DiT (Diffusion)**
+Train the main diffusion model using the pre-trained VAE.
+```bash
+python train_advanced.py --config config_advanced.yaml --vae_checkpoint runs/vae_train/final_vae.pth
 ```
 
-**2. Overriding via CLI**
-You can override specific settings from the config file by passing them as arguments:
-```bash
-python train_advanced.py --config config_advanced.yaml --batch_size 2 --lr 5e-5
-```
+---
 
-**3. Full Pipeline (Automated)**
-To run the complete two-stage training process (Pre-train VAE -> Train DiT), use the provided shell script:
+### Alternative: Automated Pipeline
+You can run both stages automatically using the provided script:
 ```bash
 ./train_full_pipeline.sh
 ```
-This script handles:
-1.  **Stage 1:** Pre-trains the 3D VAE (100 epochs) to learn efficient video compression.
-2.  **Stage 2:** Trains the DiT model (600 epochs) using the pre-trained VAE.
+
+### Alternative: Quick Start (Single Stage)
+If you just want to test the pipeline (VAE will be random/frozen or trained from scratch depending on config):
+```bash
+python train_advanced.py --config config_advanced.yaml
+```
 
 ### Key Parameters (Advanced)
 
