@@ -83,6 +83,16 @@ python train_advanced.py \
     --use_ema
 ```
 
+### 4. Full Pipeline (Automated)
+To run the complete two-stage training process (Pre-train VAE -> Train DiT), use the provided shell script:
+
+```bash
+./train_full_pipeline.sh
+```
+This script handles:
+1.  **Stage 1:** Pre-trains the 3D VAE (100 epochs) to learn efficient video compression.
+2.  **Stage 2:** Trains the DiT model (600 epochs) using the pre-trained VAE.
+
 ## 🔧 Key Parameters
 
 ### Data Settings
